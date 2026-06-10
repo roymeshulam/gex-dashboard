@@ -395,6 +395,18 @@
       state.flowMode = b.dataset.mode; renderFlowView();
     }));
   window.addEventListener("hashchange", applyRoute);
+  // Re-render when crossing the mobile/desktop breakpoint (phone rotation,
+  // resized panes) so width-dependent chart options like cell labels update.
+  let lastNarrow = window.innerWidth <= 768;
+  function breakpointCheck() {
+    const narrow = window.innerWidth <= 768;
+    if (narrow !== lastNarrow) { lastNarrow = narrow; renderAll(); }
+  }
+  window.addEventListener("resize", breakpointCheck);
+  try {
+    window.matchMedia("(max-width: 768px)")
+      .addEventListener("change", breakpointCheck);
+  } catch (e) {}
 
   if (!location.hash) {
     let saved = null;

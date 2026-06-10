@@ -12,10 +12,6 @@
 
   const instances = {};
 
-  function isMobile() {
-    return window.matchMedia("(max-width: 768px)").matches;
-  }
-
   function chart(el, heightPx) {
     if (heightPx) el.style.height = heightPx + "px";
     let inst = instances[el.id];
@@ -43,12 +39,20 @@
 
   /* ---------------- GEX heatmap (strikes x expirations) ---------------- */
 
-  function renderHeatmap(el, hm, status) {
+  function renderHeatmap(el, hm, status, attempt) {
+    // The container can be 0-wide before first layout (hidden panel, preview
+    // panes). Width drives label format, so wait for a real measurement.
+    const w = el.clientWidth || document.body.clientWidth;
+    if (!w && (attempt || 0) < 10) {
+      setTimeout(() => renderHeatmap(el, hm, status, (attempt || 0) + 1), 120);
+      return;
+    }
     const rows = hm.strikes.length;
-    const inst = chart(el, Math.max(420, rows * 16 + 130));
+    const mobile = (w || window.innerWidth) <= 768;
+    // Taller rows when labels are printed in the cells.
+    const inst = chart(el, Math.max(420, rows * (mobile ? 16 : 19) + 130));
     const yLabels = hm.strikes.map(Fmt.fmtStrike);
     const xLabels = hm.expiries.map(Fmt.fmtExpiry);
-    const showLabels = !isMobile() && hm.cells.length <= 700;
     const spotLabel = hm.spot_row !== null ? yLabels[hm.spot_row] : null;
 
     // Clip the color scale at the ~88th percentile of |GEX| so a single
@@ -96,10 +100,26 @@
         type: "heatmap",
         data: cells,
         label: {
-          show: showLabels, fontSize: 8, color: "#cfd6e4",
+          // Print the GEX value in every meaningful cell, reference-site
+          // style. Desktop: "-76.9M" / "+1.2B". Narrow screens: bare $M
+          // integers ("-77") so they fit ~26px cells. Cells under a few % of
+          // the color scale stay blank to keep far-OTM noise clean.
+          show: true,
+          fontSize: mobile ? 7.5 : 9, fontWeight: 600, color: "#f2f5fa",
+          textBorderColor: "rgba(0,0,0,0.65)", textBorderWidth: 2,
           formatter: (p) => {
             const v = p.value[3];
-            return Math.abs(v) >= vmax * 0.5 ? Math.round(v) : "";
+            const a = Math.abs(v);
+            if (mobile) {
+              if (a < Math.max(1, vmax * 0.15)) return "";
+              return String(Math.round(v));
+            }
+            if (a < Math.max(1, vmax * 0.04)) return "";
+            let s;
+            if (a >= 1000) s = (a / 1000).toFixed(1) + "B";
+            else if (a >= 100) s = Math.round(a) + "M";
+            else s = a.toFixed(1) + "M";
+            return (v < 0 ? "-" : "+") + s;
           },
         },
         itemStyle: { borderColor: "#0b0e14", borderWidth: 1 },

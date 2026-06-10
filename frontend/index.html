@@ -5,12 +5,12 @@
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <meta name="description" content="Free SPX / SPY / QQQ gamma exposure (GEX) heatmap, strike map, 0DTE roadmap, option flow and sentiment dashboard. Educational use only.">
   <title>Tam-Gamma — SPX · SPY · QQQ GEX dashboard</title>
-  <link rel="stylesheet" href="/css/style.css">
+  <link rel="stylesheet" href="/css/style.css?v=4">
   <script defer src="https://cdn.jsdelivr.net/npm/echarts@5.5.1/dist/echarts.min.js"></script>
-  <script defer src="/js/format.js"></script>
-  <script defer src="/js/api.js"></script>
-  <script defer src="/js/charts.js"></script>
-  <script defer src="/js/app.js"></script>
+  <script defer src="/js/format.js?v=4"></script>
+  <script defer src="/js/api.js?v=4"></script>
+  <script defer src="/js/charts.js?v=4"></script>
+  <script defer src="/js/app.js?v=4"></script>
 </head>
 <body>
   <header class="topbar">
@@ -43,7 +43,7 @@
     <section id="panel-heatmap" class="panel">
       <div class="panel-note">Net gamma exposure by strike × expiration.
         Green = positive GEX (dealers dampen moves), red = negative GEX
-        (dealers amplify moves). Dashed line = spot.</div>
+        (dealers amplify moves). Dashed line = spot. On phones, cell values are in $ millions.</div>
       <div class="chart-box" id="chart-heatmap"></div>
     </section>
 
