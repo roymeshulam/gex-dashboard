@@ -1,6 +1,6 @@
 # Tam-Gamma
 
-[![Deploy to Render](https://render.com/images/deploy-to-render-button.svg)](https://render.com/deploy?repo=https://github.com/tamilselvanmp/tam-gex-dashboard)
+[![Deploy to Render][render-badge]][render-deploy]
 
 Free, self-hosted **SPX / SPY / QQQ gamma-exposure dashboard** in the style of
 spxgexheatmap.com: GEX heatmap, strike map with walls & gamma flip, 0DTE
@@ -23,16 +23,25 @@ pytest -q                                  # 39 unit tests
 uvicorn app.main:app --reload --port 8000
 ```
 
-Open http://localhost:8000 (dashboard) and http://localhost:8000/guide.html
-(how to read it).
+```powershell
+python -m venv .venv
+.\.venv\Scripts\Activate.ps1
+pip install -r requirements.txt
+pytest -q                                  # 39 unit tests
+uvicorn app.main:app --reload --port 8000
+```
+
+Open the [dashboard](http://localhost:8000) and the
+[usage guide](http://localhost:8000/guide.html).
 
 ## API
 
-| Endpoint | Description |
-|---|---|
-| `GET /api/{spx\|spy\|qqq}/snapshot?views=heatmap,strikemap,flow,sentiment,zerodte` | Computed snapshot. `status` + `meta` always included; `views` picks payload slices (gzipped, ~1–6 KB each). |
-| `GET /api/trinity` | SPX+SPY+QQQ comparison, walls/flip normalized to % from spot. |
-| `GET /healthz` | Liveness — never calls upstream. |
+- `GET /api/{spx|spy|qqq}/snapshot` returns a computed snapshot. Use the
+  `views` query parameter to request `heatmap`, `strikemap`, `flow`,
+  `sentiment`, or `zerodte`. The response always includes `status` and `meta`.
+- `GET /api/trinity` compares SPX, SPY, and QQQ, with walls and gamma flips
+  normalized as percentages from spot.
+- `GET /healthz` provides a liveness check without calling the upstream API.
 
 ## How it stays free-tier friendly
 
@@ -69,3 +78,6 @@ notice and recovers automatically (~30–60 s).
 - Buy/sell flow classification is a quote-rule heuristic on delayed data —
   an estimate, not tape-true aggressor flow.
 - Educational market-structure tool. **Not financial advice.**
+
+[render-badge]: https://render.com/images/deploy-to-render-button.svg
+[render-deploy]: https://render.com/deploy?repo=https://github.com/tamilselvanmp/tam-gex-dashboard
