@@ -1,7 +1,9 @@
 from __future__ import annotations
 
+import datetime
+
 from app import config
-from app.engine import gex
+from app.engine import flow, gex
 from tests.conftest import EXP_A, EXP_B, mk
 
 
@@ -69,8 +71,27 @@ def test_heatmap_structure_and_conservation():
     assert abs(total_cells - expected) < 0.5
 
 
+def test_expiry_dropdowns_include_thirty_expirations():
+    start = datetime.date(2099, 1, 1)
+    contracts = [
+        mk("C", 7400, gamma=0.001, oi=10, volume=10,
+           expiry=start + datetime.timedelta(days=i))
+        for i in range(31)
+    ]
+    cfg = config.SYMBOLS["SPX"]
+
+    heatmap = gex.build_heatmap(contracts, 7400.0, cfg)
+    strikemap = gex.build_strikemap(contracts, 7400.0, cfg)
+    option_flow = flow.build_flow(contracts, 7400.0, cfg)
+
+    assert len(heatmap["expiries"]) == 14
+    assert len(strikemap["expiries"]) == 31  # "ALL" plus 30 dates
+    assert len(option_flow["expiries"]) == 31
+    assert strikemap["expiries"][-1] == (start + datetime.timedelta(days=29)).isoformat()
+    assert option_flow["expiries"][-1] == (start + datetime.timedelta(days=29)).isoformat()
+
+
 def test_zero_dte_empty_state():
-    import datetime
     cs = [mk("C", 7400, gamma=0.001, oi=10, expiry=EXP_A)]
     z = gex.build_zero_dte(cs, 7400.0, config.SYMBOLS["SPX"],
                            today=datetime.date(2026, 6, 9))
@@ -79,7 +100,6 @@ def test_zero_dte_empty_state():
 
 
 def test_zero_dte_available():
-    import datetime
     today = datetime.date(2026, 6, 9)
     cs = [mk("C", 7400, gamma=0.001, oi=100, volume=500, expiry=today),
           mk("P", 7390, gamma=0.001, oi=100, volume=300, expiry=today),

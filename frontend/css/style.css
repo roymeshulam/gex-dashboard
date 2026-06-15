@@ -186,10 +186,11 @@ body.first-load .chart-box {
 /* ------------------------------ mobile ------------------------------ */
 @media (max-width: 768px) {
   main { padding: 10px 10px 84px; }  /* room for bottom nav */
-  .topbar { padding: 8px 10px; gap: 8px; }
+  .topbar { flex-wrap: wrap; padding: 8px 10px; gap: 8px; }
   .brand { font-size: 14px; }
+  .symbols { order: 2; width: 100%; justify-content: center; }
   .symbols button { padding: 5px 9px; font-size: 12px; }
-  .guide-link { display: none; }
+  .guide-link { padding: 5px 2px; }
 
   .tabs {
     position: fixed; bottom: 0; left: 0; right: 0; z-index: 40;
