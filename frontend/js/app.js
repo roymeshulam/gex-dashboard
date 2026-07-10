@@ -108,10 +108,14 @@
       renderAll();
     } catch (e) {
       if (ctrl.signal.aborted) return;
+      console.error("Dashboard refresh failed", e);
       state.retries += 1;
       const wait = Math.min(5 * Math.pow(2, state.retries - 1), 20);
       state.countdown = wait;
-      banner("Data fetch failed — retrying in " + wait + "s", "error");
+      const message = window.echarts
+        ? "Data fetch failed — retrying in " + wait + "s"
+        : "Chart library failed to load — retrying in " + wait + "s";
+      banner(message, "error");
       setChip("retry " + wait + "s", "error");
     } finally {
       if (state.wakeTimer) { clearTimeout(state.wakeTimer); state.wakeTimer = null; }
