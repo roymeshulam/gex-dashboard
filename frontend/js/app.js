@@ -4,13 +4,12 @@
   "use strict";
 
   const REFRESH_SEC = 30;
-  const SYMBOLS = ["SPX", "SPY", "QQQ"];
   const VIEWS = ["heatmap", "strikemap", "zerodte", "flow", "sentiment"];
 
   const state = {
-    symbol: "SPX", view: "heatmap",
+    view: "heatmap",
     countdown: REFRESH_SEC, loading: false, abort: null,
-    retries: 0, lastFetch: 0, data: null, trinity: null,
+    retries: 0, lastFetch: 0, data: null,
     strikemapExpiry: "ALL", flowExpiry: "ALL", flowMode: "vol",
     wakeTimer: null,
   };
@@ -23,39 +22,26 @@
 
   function parseHash() {
     const h = (location.hash || "").replace(/^#\/?/, "").toLowerCase();
-    if (h.startsWith("trinity")) return { symbol: "TRINITY", view: null };
     const parts = h.split("/");
-    const sym = (parts[0] || "spx").toUpperCase();
-    const view = parts[1] || "heatmap";
-    return {
-      symbol: SYMBOLS.includes(sym) ? sym : "SPX",
-      view: VIEWS.includes(view) ? view : "heatmap",
-    };
+    const view = parts[0] === "spx" ? parts[1] : parts[0];
+    return VIEWS.includes(view) ? view : "heatmap";
   }
 
-  function navigate(symbol, view) {
-    location.hash = symbol === "TRINITY" ? "#/trinity"
-      : "#/" + symbol.toLowerCase() + "/" + view;
+  function navigate(view) {
+    location.hash = "#/" + view;
   }
 
   function applyRoute() {
-    const r = parseHash();
-    const changed = r.symbol !== state.symbol || r.view !== state.view;
-    state.symbol = r.symbol;
-    if (r.view) state.view = r.view;
+    const view = parseHash();
+    const changed = view !== state.view;
+    state.view = view;
     try { localStorage.setItem("gexdash.route", location.hash); } catch (e) {}
 
-    document.querySelectorAll("#symbolNav button").forEach((b) =>
-      b.classList.toggle("active", b.dataset.symbol === state.symbol));
     document.querySelectorAll("#viewTabs button").forEach((b) =>
       b.classList.toggle("active", b.dataset.view === state.view));
 
-    const trinity = state.symbol === "TRINITY";
-    $("viewTabs").classList.toggle("hidden", trinity);
-    $("statusRow").classList.toggle("hidden", trinity);
     VIEWS.forEach((v) =>
-      $("panel-" + v).classList.toggle("hidden", trinity || v !== state.view));
-    $("panel-trinity").classList.toggle("hidden", !trinity);
+      $("panel-" + v).classList.toggle("hidden", v !== state.view));
 
     // Guard double-refresh at startup: restoring the saved route sets
     // location.hash, which re-fires applyRoute while the first fetch runs.
@@ -85,7 +71,7 @@
     state.loading = true;
     setChip("updating…", "busy");
 
-    const isFirst = !state.data && !state.trinity;
+    const isFirst = !state.data;
     if (isFirst) {
       if (state.wakeTimer) clearTimeout(state.wakeTimer);  // no orphan timers
       state.wakeTimer = setTimeout(() =>
@@ -94,14 +80,9 @@
     }
 
     try {
-      if (state.symbol === "TRINITY") {
-        state.trinity = await Api.fetchTrinity(
-          { signal: ctrl.signal, timeout: isFirst ? 90000 : 30000 });
-      } else {
-        state.data = await Api.fetchSnapshot(
-          state.symbol, state.view === "heatmap" ? "heatmap" : state.view,
-          { signal: ctrl.signal, timeout: isFirst ? 90000 : 30000 });
-      }
+      state.data = await Api.fetchSnapshot(
+        state.view === "heatmap" ? "heatmap" : state.view,
+        { signal: ctrl.signal, timeout: isFirst ? 90000 : 30000 });
       state.retries = 0;
       state.countdown = REFRESH_SEC;
       banner(null);
@@ -200,7 +181,7 @@
   function fillExpirySelect(sel, keys, current) {
     sel.innerHTML = keys.map((k) =>
       '<option value="' + k + '"' + (k === current ? " selected" : "") + ">" +
-      (k === "ALL" ? "All expirations" : Fmt.fmtExpiry(k)) + "</option>").join("");
+      Fmt.fmtExpiryDte(k) + "</option>").join("");
   }
 
   function renderHeatmapView() {
@@ -327,44 +308,7 @@
       card("P/C OI", mm.pcr_oi === null ? "—" : mm.pcr_oi);
   }
 
-  function renderTrinity() {
-    const t = state.trinity;
-    if (!t) return;
-    const ag = $("trinityAgreement");
-    ag.textContent = t.agreement.label;
-    ag.className = "banner " + (t.agreement.aligned ? "ok" : "warn-banner");
-
-    const grid = $("trinityGrid");
-    const cols = Object.keys(t.symbols);
-    grid.innerHTML = cols.map((sym) => {
-      const s = t.symbols[sym];
-      const chg = s.change_pct >= 0 ? "pos" : "neg";
-      const reg = s.regime === "positive" ? "pos" : "neg";
-      return '<div class="card tcol">' +
-        '<div class="thead"><b>' + sym + "</b> <span>" + Fmt.fmtStrike(s.spot) +
-        '</span> <small class="' + chg + '">' + Fmt.fmtPct(s.change_pct) + "</small></div>" +
-        '<div class="tmeta">' +
-        '<div>Regime <b class="' + reg + '">' + s.regime + "</b></div>" +
-        "<div>Net GEX <b>" + Fmt.fmtBn(s.net_gex_bn) + "</b></div>" +
-        "<div>Flip <b>" + Fmt.fmtStrike(s.flip) + "</b> <small>(" +
-          Fmt.fmtPct(s.flip_pct) + ")</small></div>" +
-        '<div>Call Wall <b class="pos">' + Fmt.fmtStrike(s.call_wall) +
-          "</b> <small>(" + Fmt.fmtPct(s.call_wall_pct) + ")</small></div>" +
-        '<div>Put Wall <b class="neg">' + Fmt.fmtStrike(s.put_wall) +
-          "</b> <small>(" + Fmt.fmtPct(s.put_wall_pct) + ")</small></div>" +
-        "<div>Sentiment <b>" + s.sentiment_score.toFixed(0) + " · " +
-          esc(s.sentiment_label) + "</b></div>" +
-        "</div>" +
-        '<div class="chart-box" id="chart-trinity-' + sym + '"></div>' +
-        "</div>";
-    }).join("");
-    cols.forEach((sym) =>
-      Charts.renderTrinityMini($("chart-trinity-" + sym),
-        t.symbols[sym].mini_rows));
-  }
-
   function renderAll() {
-    if (state.symbol === "TRINITY") { renderTrinity(); return; }
     if (!state.data) return;
     renderStatus();
     if (state.view === "heatmap") renderHeatmapView();
@@ -376,17 +320,12 @@
 
   /* ------------------------------ wiring ------------------------------ */
 
-  document.querySelectorAll("#symbolNav button").forEach((b) =>
-    b.addEventListener("click", () => {
-      state.data = null;  // force refetch for the new symbol
-      navigate(b.dataset.symbol, state.view || "heatmap");
-    }));
   document.querySelectorAll("#viewTabs button").forEach((b) =>
     b.addEventListener("click", () => {
       const needsFetch = !state.data ||
         !state.data.views[b.dataset.view === "heatmap" ? "heatmap" : b.dataset.view];
       if (needsFetch) state.data = null;
-      navigate(state.symbol, b.dataset.view);
+      navigate(b.dataset.view);
     }));
   $("expirySelect").addEventListener("change", (e) => {
     state.strikemapExpiry = e.target.value; renderStrikemapView();

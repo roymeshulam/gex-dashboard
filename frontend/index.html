@@ -3,27 +3,21 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-  <meta name="description" content="Free SPX / SPY / QQQ gamma exposure (GEX) heatmap, strike map, 0DTE roadmap, option flow and sentiment dashboard. Educational use only.">
-  <title>GEX Dashboard — SPX · SPY · QQQ</title>
+  <meta name="description" content="Free SPX gamma exposure (GEX) heatmap, strike map, 0DTE roadmap, option flow and sentiment dashboard. Educational use only.">
+  <title>GEX Dashboard</title>
   <link rel="icon" href="/favicon.ico" sizes="any">
   <link rel="icon" type="image/png" href="/favicon-32.png" sizes="32x32">
   <link rel="apple-touch-icon" href="/apple-touch-icon.png">
-  <link rel="stylesheet" href="/css/style.css?v=5">
+  <link rel="stylesheet" href="/css/style.css?v=7">
   <script defer src="/js/vendor/echarts.min.js?v=5.5.1"></script>
-  <script defer src="/js/format.js?v=4"></script>
-  <script defer src="/js/api.js?v=4"></script>
-  <script defer src="/js/charts.js?v=4"></script>
-  <script defer src="/js/app.js?v=4"></script>
+  <script defer src="/js/format.js?v=5"></script>
+  <script defer src="/js/api.js?v=5"></script>
+  <script defer src="/js/charts.js?v=5"></script>
+  <script defer src="/js/app.js?v=6"></script>
 </head>
 <body>
   <header class="topbar">
     <div class="brand">GEX <span>Dashboard</span></div>
-    <nav class="symbols" id="symbolNav">
-      <button data-symbol="SPX">SPX</button>
-      <button data-symbol="SPY">SPY</button>
-      <button data-symbol="QQQ">QQQ</button>
-      <button data-symbol="TRINITY">Trinity</button>
-    </nav>
     <div class="top-right">
       <span id="refreshChip" class="chip">—</span>
       <a class="guide-link" href="/guide.html">Guide</a>
@@ -113,13 +107,6 @@
       <div class="metric-grid" id="sentiMetrics"></div>
     </section>
 
-    <section id="panel-trinity" class="panel hidden">
-      <div id="trinityAgreement" class="banner ok"></div>
-      <div class="trinity-grid" id="trinityGrid"></div>
-      <div class="panel-note">Net GEX profile of the 15 strikes nearest spot,
-        expressed in % distance from spot so SPX, SPY and QQQ are directly
-        comparable.</div>
-    </section>
   </main>
 
   <footer>

@@ -45,6 +45,16 @@
     return MONTHS[parseInt(p[1], 10) - 1] + " " + parseInt(p[2], 10);
   }
 
+  function fmtExpiryDte(iso, today) {
+    if (!iso || iso === "ALL") return "All expirations";
+    const p = iso.split("-").map(Number);
+    const now = today || new Date();
+    const todayUtc = Date.UTC(now.getFullYear(), now.getMonth(), now.getDate());
+    const expiryUtc = Date.UTC(p[0], p[1] - 1, p[2]);
+    const dte = Math.round((expiryUtc - todayUtc) / 86400000);
+    return fmtExpiry(iso) + " (" + dte + " DTE)";
+  }
+
   function fmtTime(iso) {
     if (!iso) return "—";
     const d = new Date(iso);
@@ -57,5 +67,7 @@
     return et + " ET (" + local + " local)";
   }
 
-  window.Fmt = { fmtM, fmtBn, fmtCount, fmtPct, fmtStrike, fmtExpiry, fmtTime };
+  window.Fmt = {
+    fmtM, fmtBn, fmtCount, fmtPct, fmtStrike, fmtExpiry, fmtExpiryDte, fmtTime,
+  };
 })();

@@ -292,42 +292,5 @@
     inst.resize();
   }
 
-  /* -------- Trinity mini profile: % from spot vs net GEX -------- */
-
-  function renderTrinityMini(el, miniRows) {
-    const inst = chart(el, 300);
-    inst.setOption({
-      animation: false,
-      grid: { left: 52, right: 10, top: 8, bottom: 24 },
-      tooltip: {
-        backgroundColor: "#11151f", borderColor: "#1d2433", textStyle: baseText(),
-        formatter: (p) => p.name + "% from spot<br>Net GEX: <b>" + Fmt.fmtM(p.value) + "</b>",
-      },
-      xAxis: {
-        type: "value",
-        axisLabel: { color: MUTED, fontSize: 9, formatter: (v) => Fmt.fmtM(v) },
-        splitLine: { lineStyle: { color: "#161b29" } },
-      },
-      yAxis: {
-        type: "category", inverse: true,
-        data: miniRows.map((r) => (r[0] > 0 ? "+" : "") + r[0].toFixed(1)),
-        axisLabel: { color: MUTED, fontSize: 9 },
-        axisLine: { lineStyle: { color: "#1d2433" } },
-      },
-      series: [{
-        type: "bar", barCategoryGap: "30%",
-        data: miniRows.map((r) => ({
-          value: r[1], itemStyle: { color: r[1] >= 0 ? GREEN : RED },
-        })),
-        markLine: {
-          symbol: "none", silent: true,
-          lineStyle: { color: "#666", width: 1 },
-          data: [{ xAxis: 0 }], label: { show: false },
-        },
-      }],
-    }, { notMerge: true });
-    inst.resize();
-  }
-
-  window.Charts = { renderHeatmap, renderTornado, renderGauge, renderMiniBar, renderTrinityMini };
+  window.Charts = { renderHeatmap, renderTornado, renderGauge, renderMiniBar };
 })();

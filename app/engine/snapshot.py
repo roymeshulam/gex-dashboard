@@ -2,8 +2,7 @@
 JSON-ready bundle. The raw ~25MB chain JSON is discarded immediately; only
 the ~300KB computed bundle is cached.
 
-A module-level Semaphore(1) serializes fetch+parse so concurrent cold starts
-for different symbols can't stack three 25MB parses on a 512MB instance.
+A module-level semaphore prevents overlapping refreshes of the large chain.
 """
 from __future__ import annotations
 
@@ -49,11 +48,10 @@ class VixCache:
         return self._vix
 
 
-async def build_snapshot(symbol: str, client: httpx.AsyncClient,
-                         vix_cache: VixCache) -> dict:
-    cfg = config.SYMBOLS[symbol]
+async def build_snapshot(client: httpx.AsyncClient, vix_cache: VixCache) -> dict:
+    cfg = config.SPX
     async with FETCH_SEMAPHORE:
-        chain = await cboe.fetch_chain(client, symbol)
+        chain = await cboe.fetch_chain(client)
     vix = await vix_cache.get(client)
 
     spot = chain.spot
@@ -68,6 +66,7 @@ async def build_snapshot(symbol: str, client: httpx.AsyncClient,
 
     heatmap = gex_engine.build_heatmap(contracts, spot, cfg)
     strikemap = gex_engine.build_strikemap(contracts, spot, cfg)
+    levels = gex_engine.build_expiry_levels(contracts, spot)
     zerodte = gex_engine.build_zero_dte(contracts, spot, cfg, today)
     flow = flow_engine.build_flow(contracts, spot, cfg)
     zshare = zerodte["stats"]["dte_share_pct"] if zerodte.get("available") else 0.0
@@ -97,6 +96,7 @@ async def build_snapshot(symbol: str, client: httpx.AsyncClient,
         "status": status,
         "heatmap": heatmap,
         "strikemap": strikemap,
+        "levels": levels,
         "flow": flow,
         "sentiment": senti,
         "zerodte": zerodte,

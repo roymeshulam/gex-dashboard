@@ -255,6 +255,21 @@ def build_strikemap(contracts: List[Contract], spot: float, cfg: dict) -> dict:
     }
 
 
+def build_expiry_levels(contracts: List[Contract], spot: float) -> Dict[str, dict]:
+    """Wall and flip levels for every expiration in the chain."""
+    levels = {}
+    for expiry in sorted({c.expiry for c in contracts}):
+        profile = strike_profile(contracts, spot, expiry=expiry)
+        call_wall, put_wall = find_walls(profile)
+        flip = find_flip(profile, spot)
+        levels[expiry.isoformat()] = {
+            "call_wall": call_wall,
+            "flip": round(flip, 2) if flip is not None else None,
+            "put_wall": put_wall,
+        }
+    return levels
+
+
 def build_zero_dte(contracts: List[Contract], spot: float, cfg: dict,
                    today: datetime.date) -> dict:
     """Same-day expiration roadmap; friendly empty state when none trades."""

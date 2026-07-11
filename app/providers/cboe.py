@@ -44,7 +44,7 @@ class OccParseError(CboeError):
 def parse_occ(occ: str) -> Tuple[str, datetime.date, str, float]:
     """'SPXW260612P07400000' -> ('SPXW', date(2026,6,12), 'P', 7400.0).
 
-    Strike is the last 8 digits / 1000 (SPY260620P00612500 -> 612.5).
+    Strike is the last 8 digits divided by 1000.
     """
     m = OCC_RE.match(occ or "")
     if not m:
@@ -77,21 +77,20 @@ def _f(v) -> float:
         return 0.0
 
 
-def normalize(raw: dict, symbol: str,
-              today: Optional[datetime.date] = None) -> ChainData:
-    """Raw CBOE JSON -> ChainData. Filters to the symbol's OCC roots, drops
+def normalize(raw: dict, today: Optional[datetime.date] = None) -> ChainData:
+    """Raw CBOE JSON -> ChainData. Filters to SPX OCC roots, drops
     expired contracts, coerces missing numerics to 0. The (large) raw dict is
     not retained."""
-    cfg = config.SYMBOLS[symbol]
+    cfg = config.SPX
     try:
         data = raw["data"]
         options = data["options"]
     except (KeyError, TypeError) as e:
-        raise CboeParseError(f"unexpected CBOE schema for {symbol}: {e}")
+        raise CboeParseError(f"unexpected CBOE schema for SPX: {e}")
 
     spot = _f(data.get("current_price")) or _f(data.get("close")) or _f(data.get("prev_day_close"))
     if not spot:
-        raise CboeParseError(f"no usable spot price for {symbol}")
+        raise CboeParseError("no usable spot price for SPX")
 
     if today is None:
         today = datetime.datetime.now(tz=ET).date()
@@ -114,9 +113,9 @@ def normalize(raw: dict, symbol: str,
             delta=_f(o.get("delta")), gamma=_f(o.get("gamma")),
         ))
     if skipped:
-        log.warning("%s: skipped %d unparseable OCC symbols", symbol, skipped)
+        log.warning("SPX: skipped %d unparseable OCC symbols", skipped)
     if not contracts:
-        raise CboeParseError(f"no contracts after filtering for {symbol}")
+        raise CboeParseError("no contracts after filtering for SPX")
 
     try:
         data_ts = parse_utc_timestamp(raw.get("timestamp", ""))
@@ -128,7 +127,7 @@ def normalize(raw: dict, symbol: str,
         ltt = data_ts
 
     return ChainData(
-        symbol=symbol, spot=spot,
+        symbol="SPX", spot=spot,
         change_pct=_f(data.get("price_change_percent")),
         iv30=_f(data.get("iv30")), iv30_change_pct=_f(data.get("iv30_change_percent")),
         data_ts=data_ts, last_trade_time=ltt, contracts=contracts,
@@ -155,9 +154,9 @@ async def _get_json(client: httpx.AsyncClient, code: str) -> dict:
     raise CboeUnavailable(f"CBOE unreachable for {code}: {last_exc}")
 
 
-async def fetch_chain(client: httpx.AsyncClient, symbol: str) -> ChainData:
-    raw = await _get_json(client, config.SYMBOLS[symbol]["cboe_code"])
-    return normalize(raw, symbol)
+async def fetch_chain(client: httpx.AsyncClient) -> ChainData:
+    raw = await _get_json(client, config.SPX["cboe_code"])
+    return normalize(raw)
 
 
 async def fetch_vix(client: httpx.AsyncClient) -> VixData:

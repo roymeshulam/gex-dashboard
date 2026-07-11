@@ -18,8 +18,8 @@ def test_parse_occ_spx_low_strike():
 
 
 def test_parse_occ_fractional_strike():
-    root, exp, cp, strike = cboe.parse_occ("SPY260620P00612500")
-    assert (root, cp, strike) == ("SPY", "P", 612.5)
+    root, exp, cp, strike = cboe.parse_occ("SPXW260620P00612500")
+    assert (root, cp, strike) == ("SPXW", "P", 612.5)
 
 
 @pytest.mark.parametrize("bad", ["", "BADSYMBOL", "SPX2606C00200000", "260618C00200000"])
@@ -41,12 +41,12 @@ def test_parse_timestamps():
 
 def test_normalize_filters_and_coerces(mini_chain_raw):
     today = datetime.date(2026, 6, 9)
-    chain = cboe.normalize(mini_chain_raw, "SPX", today=today)
+    chain = cboe.normalize(mini_chain_raw, today=today)
 
     assert chain.spot == 7400.0
     assert chain.iv30 == 16.12
     assert chain.change_pct == -0.26
-    # 12 raw options: QQQ root, expired 2020 contract and BADSYMBOL are gone.
+    # 12 raw options: unrelated root, expired contract, and malformed symbol are gone.
     assert len(chain.contracts) == 9
     roots = {c.root for c in chain.contracts}
     assert roots == {"SPX", "SPXW"}
@@ -62,10 +62,10 @@ def test_normalize_filters_and_coerces(mini_chain_raw):
 def test_normalize_spot_fallback(mini_chain_raw):
     mini_chain_raw["data"]["current_price"] = 0
     mini_chain_raw["data"]["close"] = 0
-    chain = cboe.normalize(mini_chain_raw, "SPX", today=datetime.date(2026, 6, 9))
+    chain = cboe.normalize(mini_chain_raw, today=datetime.date(2026, 6, 9))
     assert chain.spot == 7419.0  # prev_day_close
 
 
 def test_normalize_rejects_bad_schema():
     with pytest.raises(cboe.CboeParseError):
-        cboe.normalize({"nope": 1}, "SPX")
+        cboe.normalize({"nope": 1})

@@ -8,7 +8,7 @@ from typing import List
 
 @dataclass
 class Contract:
-    root: str                 # SPX | SPXW | SPY | QQQ
+    root: str                 # SPX | SPXW
     expiry: datetime.date
     cp: str                   # "C" | "P"
     strike: float

@@ -1,20 +1,14 @@
-"""Central configuration: symbols, windows, TTLs, sentiment weights."""
+"""Central configuration: SPX windows, TTLs, and sentiment weights."""
 from __future__ import annotations
 
 CBOE_BASE = "https://cdn.cboe.com/api/global/delayed_quotes/options/{code}.json"
 
-# Per-symbol chain config.
-#   cboe_code  — path code on cdn.cboe.com (indices are underscore-prefixed)
-#   roots      — OCC roots that belong to this symbol (SPX has SPXW weeklies)
-#   window_pct — strike window around spot for heatmap/strike map
-#   steps      — candidate bucket steps (points); smallest fitting MAX_HEATMAP_ROWS wins
-SYMBOLS = {
-    "SPX": {"cboe_code": "_SPX", "roots": {"SPX", "SPXW"}, "window_pct": 0.08,
-            "steps": [5.0, 10.0, 25.0, 50.0, 100.0]},
-    "SPY": {"cboe_code": "SPY", "roots": {"SPY"}, "window_pct": 0.10,
-            "steps": [1.0, 2.0, 5.0, 10.0]},
-    "QQQ": {"cboe_code": "QQQ", "roots": {"QQQ"}, "window_pct": 0.10,
-            "steps": [1.0, 2.0, 5.0, 10.0]},
+# The SPX chain includes standard SPX contracts and SPXW weeklies.
+SPX = {
+    "cboe_code": "_SPX",
+    "roots": {"SPX", "SPXW"},
+    "window_pct": 0.08,
+    "steps": [5.0, 10.0, 25.0, 50.0, 100.0],
 }
 VIX_CODE = "_VIX"
 

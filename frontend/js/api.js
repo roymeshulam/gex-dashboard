@@ -25,12 +25,9 @@
   }
 
   window.Api = {
-    fetchSnapshot(symbol, views, opts) {
+    fetchSnapshot(views, opts) {
       const v = encodeURIComponent(views || "summary");
-      return getJSON("/api/" + symbol.toLowerCase() + "/snapshot?views=" + v, opts);
-    },
-    fetchTrinity(opts) {
-      return getJSON("/api/trinity", opts);
+      return getJSON("/api/spx/snapshot?views=" + v, opts);
     },
   };
 })();

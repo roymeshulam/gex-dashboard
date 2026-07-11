@@ -7,7 +7,7 @@
   <link rel="icon" href="/favicon.ico" sizes="any">
   <link rel="icon" type="image/png" href="/favicon-32.png" sizes="32x32">
   <link rel="apple-touch-icon" href="/apple-touch-icon.png">
-  <link rel="stylesheet" href="/css/style.css?v=5">
+  <link rel="stylesheet" href="/css/style.css?v=7">
   <style>
     .doc { max-width: 760px; margin: 0 auto; padding: 20px 16px 60px; }
     .doc h1 { font-size: 22px; }
@@ -26,10 +26,10 @@
 
   <div class="doc">
     <h1>How to read this dashboard</h1>
-    <p>This tool estimates options-based support/resistance structure for SPX,
-    SPY and QQQ from the free CBOE delayed options chain. Everything is
-    recalculated from a fresh snapshot every 30 seconds. It is an educational
-    market-structure tool — <b>not financial advice</b>.</p>
+    <p>This tool estimates options-based support/resistance structure for SPX
+    from the free CBOE delayed options chain. Everything is recalculated from a
+    fresh snapshot every 30 seconds. It is an educational market-structure
+    tool — <b>not financial advice</b>.</p>
 
     <h2>What is GEX?</h2>
     <p>Gamma exposure (GEX) estimates how much option dealers must hedge as the
@@ -95,12 +95,6 @@
     <p>Missing components (e.g. VIX feed down) are dropped and weights
     renormalized. Labels: ≥+50 Strongly Bullish, +15…+50 Bullish, ±15 Neutral,
     −15…−50 Bearish, ≤−50 Strongly Bearish.</p>
-
-    <h2>Trinity</h2>
-    <p>SPX, SPY and QQQ side by side. Walls and flip are shown in % distance
-    from spot so the three markets are directly comparable. Agreement across
-    all three (same regime) makes the structure more reliable; divergence is a
-    caution flag.</p>
 
     <h2>A practical workflow</h2>
     <ul>

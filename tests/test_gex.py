@@ -29,7 +29,7 @@ def test_choose_step_spx():
     assert gex.choose_step(7386.0, 0.08, [5.0, 10.0, 25.0, 50.0, 100.0], 55) == 25.0
 
 
-def test_choose_step_spy():
+def test_choose_step_small_underlying():
     assert gex.choose_step(735.0, 0.10, [1.0, 2.0, 5.0, 10.0], 55) == 5.0
 
 
@@ -51,7 +51,7 @@ def test_totals_split():
 
 def test_heatmap_structure_and_conservation():
     spot = 7400.0
-    cfg = config.SYMBOLS["SPX"]
+    cfg = config.SPX
     cs = [
         mk("C", 7400, gamma=0.001, oi=1000, expiry=EXP_A),
         mk("P", 7350, gamma=0.0009, oi=1500, expiry=EXP_A),
@@ -78,7 +78,7 @@ def test_expiry_dropdowns_include_thirty_expirations():
            expiry=start + datetime.timedelta(days=i))
         for i in range(31)
     ]
-    cfg = config.SYMBOLS["SPX"]
+    cfg = config.SPX
 
     heatmap = gex.build_heatmap(contracts, 7400.0, cfg)
     strikemap = gex.build_strikemap(contracts, 7400.0, cfg)
@@ -93,7 +93,7 @@ def test_expiry_dropdowns_include_thirty_expirations():
 
 def test_zero_dte_empty_state():
     cs = [mk("C", 7400, gamma=0.001, oi=10, expiry=EXP_A)]
-    z = gex.build_zero_dte(cs, 7400.0, config.SYMBOLS["SPX"],
+    z = gex.build_zero_dte(cs, 7400.0, config.SPX,
                            today=datetime.date(2026, 6, 9))
     assert z["available"] is False
     assert z["next_expiry"] == EXP_A.isoformat()
@@ -104,8 +104,23 @@ def test_zero_dte_available():
     cs = [mk("C", 7400, gamma=0.001, oi=100, volume=500, expiry=today),
           mk("P", 7390, gamma=0.001, oi=100, volume=300, expiry=today),
           mk("C", 7450, gamma=0.001, oi=100, volume=200, expiry=EXP_A)]
-    z = gex.build_zero_dte(cs, 7400.0, config.SYMBOLS["SPX"], today=today)
+    z = gex.build_zero_dte(cs, 7400.0, config.SPX, today=today)
     assert z["available"] is True
     assert z["stats"]["dte_volume"] == 800
     assert z["stats"]["dte_share_pct"] == 80.0
     assert len(z["rows"]) > 0
+
+
+def test_build_expiry_levels():
+    cs = [
+        mk("P", 7300, gamma=0.001, oi=100, expiry=EXP_A),
+        mk("C", 7500, gamma=0.001, oi=200, expiry=EXP_A),
+        mk("C", 7600, gamma=0.001, oi=100, expiry=EXP_B),
+    ]
+
+    levels = gex.build_expiry_levels(cs, 7400.0)
+
+    assert levels[EXP_A.isoformat()]["call_wall"] == 7500
+    assert levels[EXP_A.isoformat()]["put_wall"] == 7300
+    assert levels[EXP_B.isoformat()]["call_wall"] == 7600
+    assert levels[EXP_B.isoformat()]["put_wall"] is None

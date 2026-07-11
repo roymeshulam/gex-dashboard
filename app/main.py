@@ -5,15 +5,14 @@ import logging
 import os
 from contextlib import asynccontextmanager
 
-import httpx
 from fastapi import FastAPI
 from fastapi.middleware.gzip import GZipMiddleware
+from fastapi.responses import RedirectResponse
 from fastapi.staticfiles import StaticFiles
 
-from . import config
 from .api.routes import router
-from .cache import SnapshotCache
-from .engine.snapshot import VixCache
+from .mcp_server import mcp
+from .runtime import runtime
 
 logging.basicConfig(level=logging.INFO,
                     format="%(asctime)s %(levelname)s %(name)s: %(message)s")
@@ -24,22 +23,20 @@ FRONTEND_DIR = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__fi
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    timeout = httpx.Timeout(connect=config.FETCH_CONNECT_TIMEOUT,
-                            read=config.FETCH_READ_TIMEOUT,
-                            write=5.0, pool=5.0)
-    app.state.client = httpx.AsyncClient(
-        timeout=timeout, headers={"User-Agent": config.USER_AGENT},
-        follow_redirects=True)
-    app.state.cache = SnapshotCache()
-    app.state.vix_cache = VixCache()
+    await runtime.start()
     try:
-        yield
+        if app.state.mcp_enabled:
+            async with mcp.session_manager.run():
+                yield
+        else:
+            yield
     finally:
-        await app.state.client.aclose()
+        await runtime.close()
 
 
-def create_app() -> FastAPI:
+def create_app(include_mcp: bool = True) -> FastAPI:
     app = FastAPI(title="GEX Dashboard", lifespan=lifespan)
+    app.state.mcp_enabled = include_mcp
     app.add_middleware(GZipMiddleware, minimum_size=1024)
 
     @app.middleware("http")
@@ -55,6 +52,13 @@ def create_app() -> FastAPI:
         return {"ok": True}
 
     app.include_router(router)
+    if include_mcp:
+        @app.api_route("/mcp", methods=["GET", "POST", "DELETE"],
+                       include_in_schema=False)
+        async def canonical_mcp_endpoint():
+            return RedirectResponse(url="/mcp/", status_code=307)
+
+        app.mount("/mcp", mcp.streamable_http_app(), name="mcp")
     app.mount("/", StaticFiles(directory=FRONTEND_DIR, html=True), name="frontend")
     return app
 

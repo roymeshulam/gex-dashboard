@@ -38,13 +38,12 @@ small { font-size: 11px; }
 .brand { font-weight: 800; letter-spacing: .5px; font-size: 16px; }
 .brand span { color: var(--accent); }
 
-.symbols { display: flex; gap: 4px; }
-.symbols button, .seg button {
+.seg button {
   background: transparent; color: var(--muted);
   border: 1px solid var(--border); border-radius: 8px;
   padding: 6px 12px; font-size: 13px; cursor: pointer;
 }
-.symbols button.active, .seg button.active {
+.seg button.active {
   background: var(--panel); color: var(--text); border-color: var(--accent);
 }
 
@@ -162,14 +161,6 @@ tr:last-child td { border-bottom: none; }
 .card.metric .k { font-size: 11px; color: var(--muted); text-transform: uppercase; }
 .card.metric .v { font-size: 17px; font-weight: 700; margin-top: 4px; }
 
-/* trinity */
-.trinity-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; }
-.tcol .thead { display: flex; align-items: baseline; gap: 8px; font-size: 15px; }
-.tcol .tmeta { margin: 8px 0; font-size: 12.5px; color: var(--muted);
-  display: grid; gap: 3px; }
-.tcol .tmeta b { color: var(--text); font-weight: 600; }
-.tcol .chart-box { height: 300px; border: none; }
-
 footer {
   color: var(--muted); font-size: 11.5px; line-height: 1.5;
   padding: 18px 14px 26px; max-width: 1180px; margin: 0 auto;
@@ -188,8 +179,6 @@ body.first-load .chart-box {
   main { padding: 10px 10px 84px; }  /* room for bottom nav */
   .topbar { flex-wrap: wrap; padding: 8px 10px; gap: 8px; }
   .brand { font-size: 14px; }
-  .symbols { order: 2; width: 100%; justify-content: center; }
-  .symbols button { padding: 5px 9px; font-size: 12px; }
   .guide-link { padding: 5px 2px; }
 
   .tabs {
@@ -206,8 +195,8 @@ body.first-load .chart-box {
   .tabs button i { font-size: 17px; }
   .tabs button.active { color: var(--accent); }
 
-  .grid-2, .grid-senti, .metric-grid, .trinity-grid { grid-template-columns: 1fr 1fr; }
-  .grid-senti, .trinity-grid { grid-template-columns: 1fr; }
+  .grid-2, .grid-senti, .metric-grid { grid-template-columns: 1fr 1fr; }
+  .grid-senti { grid-template-columns: 1fr; }
   .chart-box { height: 420px; }
 }
 

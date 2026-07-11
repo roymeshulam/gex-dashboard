@@ -1,107 +1,118 @@
-"""API surface: per-symbol snapshots (view slicing) + trinity + health."""
+"""API surface for the SPX snapshot views."""
 from __future__ import annotations
 
-import asyncio
+import datetime
+import json
 import logging
+import re
 
 from fastapi import APIRouter, HTTPException, Query, Request
 
-from .. import config, market
-from ..engine import snapshot as snapshot_engine
+from .. import market
 from ..providers.cboe import CboeError
+from ..runtime import runtime
 
 log = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/api")
 
 VIEWS = {"summary", "heatmap", "strikemap", "flow", "sentiment", "zerodte"}
+NONNEGATIVE_INTEGER = re.compile(r"^\d+$")
 
 
-def _envelope(symbol: str, bundle: dict, cache_meta: dict, views) -> dict:
+def _envelope(bundle: dict, cache_meta: dict, views) -> dict:
     meta = dict(bundle["meta"])
     meta.update(cache_meta)
     meta["market"] = market.market_state()
     out_views = {v: bundle[v] for v in views if v in bundle}
-    return {"symbol": symbol, "meta": meta,
+    return {"symbol": "SPX", "meta": meta,
             "status": bundle["status"], "views": out_views}
 
 
-async def _get_bundle(request: Request, symbol: str):
-    app = request.app
-    return await app.state.cache.get(
-        symbol,
-        lambda: snapshot_engine.build_snapshot(symbol, app.state.client,
-                                               app.state.vix_cache),
-    )
+async def _get_bundle(request: Request):
+    return await runtime.get_bundle()
 
 
-@router.get("/trinity")
-async def trinity(request: Request):
-    symbols = list(config.SYMBOLS)
-    results = await asyncio.gather(
-        *[_get_bundle(request, s) for s in symbols], return_exceptions=True)
-
-    out, errors = {}, {}
-    for sym, res in zip(symbols, results):
-        if isinstance(res, BaseException):
-            log.error("trinity %s failed: %s", sym, res)
-            errors[sym] = type(res).__name__
-            continue
-        bundle, _meta = res
-        st = bundle["status"]
-        spot = st["spot"] or 1.0
-
-        def pct(level):
-            return round((level - spot) / spot * 100.0, 2) if level else None
-
-        sm = bundle["strikemap"]["by_expiry"].get("ALL", {})
-        rows = sm.get("rows", [])
-        mid = st["spot"]
-        near = sorted(rows, key=lambda r: abs(r[0] - mid))[:15]
-        near.sort(key=lambda r: r[0], reverse=True)
-        out[sym] = {
-            "spot": st["spot"],
-            "change_pct": st["change_pct"],
-            "net_gex_bn": st["total_gex_bn"],
-            "regime": st["regime"],
-            "flip": st["flip"], "flip_pct": pct(st["flip"]),
-            "call_wall": st["call_wall"], "call_wall_pct": pct(st["call_wall"]),
-            "put_wall": st["put_wall"], "put_wall_pct": pct(st["put_wall"]),
-            "sentiment_score": st["sentiment_score"],
-            "sentiment_label": st["sentiment_label"],
-            "mini_rows": [[round((r[0] - spot) / spot * 100.0, 2), r[3]] for r in near],
-        }
-
-    if not out:
-        raise HTTPException(status_code=503, detail="all upstreams unavailable")
-
-    regimes = {v["regime"] for v in out.values()}
-    if len(out) == len(symbols) and len(regimes) == 1:
-        agreement = {"aligned": True,
-                     "label": f"All three in {regimes.pop()} gamma"}
-    else:
-        agreement = {"aligned": False, "label": "Mixed gamma regimes"}
-
-    return {"symbols": out, "errors": errors, "agreement": agreement,
-            "market": market.market_state()}
+def _expand_dte_values(values: list[str]) -> list[str]:
+    """Accept repeated, comma-separated, or JSON-array query values."""
+    expanded = []
+    for raw in values:
+        value = raw.strip()
+        if value.startswith("["):
+            try:
+                items = json.loads(value)
+            except json.JSONDecodeError as e:
+                raise HTTPException(status_code=422,
+                                    detail=f"invalid dte array: {e.msg}")
+            if not isinstance(items, list):
+                raise HTTPException(status_code=422, detail="dte must be a value or array")
+            expanded.extend(str(item).strip() for item in items)
+        else:
+            expanded.extend(item.strip() for item in value.split(","))
+    if not expanded or any(not item for item in expanded):
+        raise HTTPException(status_code=422, detail="dte values must not be empty")
+    return expanded
 
 
-@router.get("/{symbol}/snapshot")
-async def snapshot(request: Request, symbol: str,
-                   views: str = Query(default="summary")):
-    sym = symbol.upper()
-    if sym not in config.SYMBOLS:
-        raise HTTPException(status_code=404, detail=f"unknown symbol {symbol}")
+def _resolve_expiries(values: list[str], today: datetime.date) -> list[tuple[int, str]]:
+    resolved = []
+    for value in _expand_dte_values(values):
+        if NONNEGATIVE_INTEGER.fullmatch(value):
+            dte = int(value)
+            expiry = today + datetime.timedelta(days=dte)
+        else:
+            try:
+                expiry = datetime.date.fromisoformat(value)
+            except ValueError:
+                raise HTTPException(
+                    status_code=422,
+                    detail=f"invalid dte value {value!r}; use a non-negative integer or YYYY-MM-DD",
+                )
+            dte = (expiry - today).days
+            if dte < 0:
+                raise HTTPException(status_code=422,
+                                    detail=f"expiry {value!r} is before today")
+        resolved.append((dte, expiry.isoformat()))
+    return resolved
 
+
+def _level_response(bundle: dict, dte: int, expiry: str) -> dict:
+    levels = bundle["levels"].get(expiry)
+    return {
+        "dte": dte,
+        "expiry": expiry,
+        "available": levels is not None,
+        "call_wall": levels["call_wall"] if levels else None,
+        "flip": levels["flip"] if levels else None,
+        "put_wall": levels["put_wall"] if levels else None,
+    }
+
+
+@router.get("/spx/snapshot")
+async def snapshot(request: Request, views: str = Query(default="summary")):
     requested = {v.strip() for v in views.split(",") if v.strip()} or {"summary"}
     bad = requested - VIEWS
     if bad:
         raise HTTPException(status_code=400, detail=f"unknown views: {sorted(bad)}")
 
     try:
-        bundle, cache_meta = await _get_bundle(request, sym)
+        bundle, cache_meta = await _get_bundle(request)
     except CboeError as e:
-        log.error("%s snapshot failed: %s", sym, e)
+        log.error("SPX snapshot failed: %s", e)
         raise HTTPException(status_code=503, detail="upstream data unavailable")
 
-    return _envelope(sym, bundle, cache_meta, requested - {"summary"})
+    return _envelope(bundle, cache_meta, requested - {"summary"})
+
+
+@router.get("/spx/levels")
+async def expiry_levels(request: Request, dte: list[str] = Query(...)):
+    requested = _resolve_expiries(dte, market.today_expiry_date())
+    try:
+        bundle, _cache_meta = await _get_bundle(request)
+    except CboeError as e:
+        log.error("SPX levels failed: %s", e)
+        raise HTTPException(status_code=503, detail="upstream data unavailable")
+
+    result = [_level_response(bundle, days, expiry)
+              for days, expiry in requested]
+    return result[0] if len(result) == 1 else result

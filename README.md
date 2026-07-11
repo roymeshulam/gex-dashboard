@@ -2,10 +2,10 @@
 
 [![Deploy to Render][render-badge]][render-deploy]
 
-Free, self-hosted **SPX / SPY / QQQ gamma-exposure dashboard** in the style of
+Free, self-hosted **SPX gamma-exposure dashboard** in the style of
 spxgexheatmap.com: GEX heatmap, strike map with walls & gamma flip, 0DTE
-roadmap, option flow, a composite sentiment gauge and a Trinity (cross-market)
-view. Mobile-friendly with a bottom tab bar, auto-refreshing every 30 s.
+roadmap, option flow, and a composite sentiment gauge. Mobile-friendly with a
+bottom tab bar, auto-refreshing every 30 s.
 The header Guide link remains available on mobile, with symbol controls
 wrapping onto a second row on narrow screens.
 
@@ -42,12 +42,23 @@ Open the [dashboard](http://localhost:8000) and the
 
 ## API
 
-- `GET /api/{spx|spy|qqq}/snapshot` returns a computed snapshot. Use the
+- `GET /api/spx/snapshot` returns a computed snapshot. Use the
   `views` query parameter to request `heatmap`, `strikemap`, `flow`,
   `sentiment`, or `zerodte`. The response always includes `status` and `meta`.
-- `GET /api/trinity` compares SPX, SPY, and QQQ, with walls and gamma flips
-  normalized as percentages from spot.
+- `GET /api/spx/levels?dte=1` returns the call wall, gamma flip, and put wall
+  for an expiration. Values may be calendar DTE integers or ISO dates. Pass
+  `dte` repeatedly, comma-separated, or as a JSON array to receive an array:
+  `?dte=1&dte=5`, `?dte=1,5`, or `?dte=[1,5]`.
 - `GET /healthz` provides a liveness check without calling the upstream API.
+
+## MCP for LLM agents
+
+The server also exposes a read-only Streamable HTTP MCP endpoint at `/mcp`.
+Its `get_spx_gamma_levels` tool accepts one calendar DTE/ISO expiry or an array
+and returns the same cached call wall, gamma flip, and put wall data as the
+REST API. Tool instructions and JSON Schema are advertised during MCP tool
+discovery. See [MCP.md](MCP.md) for connection configuration, input/output
+examples, and agent guidance.
 
 ## How it stays free-tier friendly
 
