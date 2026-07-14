@@ -95,5 +95,23 @@ notice and recovers automatically (~30–60 s).
   an estimate, not tape-true aggressor flow.
 - Educational market-structure tool. **Not financial advice.**
 
+## Production restart automation
+
+`.github/workflows/restart-production.yml` runs after every successful push to
+`main` (and can also be started manually). It connects to
+`meshulro@176.57.150.218:22`, resolves the service's configured working
+directory, pulls `origin/main` with `--ff-only`, restarts the user service, and
+verifies its status. A failed pull, restart, or inactive service fails the
+workflow.
+
+Configure these secrets under **Settings → Secrets and variables → Actions**:
+
+- `DEPLOY_PASSWORD` — the SSH password; never commit it to the repository.
+- `DEPLOY_KNOWN_HOSTS` — the verified host-key line produced by
+  `ssh-keyscan -p 22 176.57.150.218`.
+
+The service's `WorkingDirectory` must point to the Git checkout and that
+checkout must have permission to pull from `origin` non-interactively.
+
 [render-badge]: https://render.com/images/deploy-to-render-button.svg
 [render-deploy]: https://render.com/deploy?repo=https://github.com/roymeshulam/gex-dashboard

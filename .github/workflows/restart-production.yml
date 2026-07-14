@@ -1,0 +1,73 @@
+name: Restart production service
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: gex-dashboard-production
+  cancel-in-progress: false
+
+jobs:
+  restart:
+    name: Restart gex-dashboard
+    runs-on: ubuntu-latest
+    environment: production
+    timeout-minutes: 5
+
+    steps:
+      - name: Validate deployment secrets
+        env:
+          DEPLOY_PASSWORD: ${{ secrets.DEPLOY_PASSWORD }}
+          DEPLOY_KNOWN_HOSTS: ${{ secrets.DEPLOY_KNOWN_HOSTS }}
+        run: |
+          test -n "$DEPLOY_PASSWORD" || {
+            echo "DEPLOY_PASSWORD is not configured" >&2
+            exit 1
+          }
+          test -n "$DEPLOY_KNOWN_HOSTS" || {
+            echo "DEPLOY_KNOWN_HOSTS is not configured" >&2
+            exit 1
+          }
+
+      - name: Install SSH password helper
+        run: |
+          sudo apt-get update
+          sudo apt-get install --yes sshpass
+
+      - name: Configure trusted host key
+        env:
+          DEPLOY_KNOWN_HOSTS: ${{ secrets.DEPLOY_KNOWN_HOSTS }}
+        run: |
+          install -d -m 700 "$HOME/.ssh"
+          printf '%s\n' "$DEPLOY_KNOWN_HOSTS" > "$HOME/.ssh/known_hosts"
+          chmod 600 "$HOME/.ssh/known_hosts"
+
+      - name: Update, restart, and verify gex-dashboard
+        env:
+          SSHPASS: ${{ secrets.DEPLOY_PASSWORD }}
+        run: |
+          sshpass -e ssh \
+            -p 22 \
+            -o ConnectTimeout=15 \
+            -o PasswordAuthentication=yes \
+            -o StrictHostKeyChecking=yes \
+            meshulro@176.57.150.218 \
+            'bash -se' <<'REMOTE'
+          export XDG_RUNTIME_DIR="/run/user/$(id -u)"
+          working_dir="$(systemctl --user show gex-dashboard --property=WorkingDirectory --value)"
+
+          if [ -z "$working_dir" ] || [ "$working_dir" = "n/a" ]; then
+            echo "gex-dashboard has no usable WorkingDirectory" >&2
+            exit 1
+          fi
+
+          git -C "$working_dir" pull --ff-only origin main
+          systemctl --user restart gex-dashboard
+          systemctl --user status gex-dashboard --no-pager
+          REMOTE
