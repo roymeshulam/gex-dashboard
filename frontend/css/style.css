@@ -157,6 +157,11 @@ tr:last-child td { border-bottom: none; }
 .confidence-summary { font-size: 13px; margin-bottom: 6px; }
 .confidence-card ul { margin: 6px 0 0; padding-left: 20px; }
 .confidence-card li { color: var(--muted); font-size: 12px; margin: 3px 0; }
+.component-help {
+  cursor: help; border-bottom: 1px dotted var(--muted); outline: none;
+}
+.component-help:focus { border-bottom-color: var(--accent); color: var(--text); }
+.help-icon { color: var(--muted); font-size: 10px; margin-left: 2px; }
 .metric-grid {
   display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px;
   margin-top: 12px;

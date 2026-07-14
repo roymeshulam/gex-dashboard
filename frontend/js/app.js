@@ -294,7 +294,10 @@
         const cls = c.score > 0 ? (riskScore ? "neg" : "pos")
           : c.score < 0 ? (riskScore ? "pos" : "neg") : "";
         return "<tr><td>" + esc(c.group === "volatility" ? "Volatility" : "Direction") +
-          "</td><td>" + esc(c.label) + "</td><td>" + c.raw +
+          "</td><td><span class=\"component-help\" tabindex=\"0\" title=\"" +
+          esc(c.description || "No explanation available.") + "\" aria-label=\"" +
+          esc(c.label + ". " + (c.description || "No explanation available.")) +
+          "\">" + esc(c.label) + " <span class=\"help-icon\" aria-hidden=\"true\">ⓘ</span></span></td><td>" + c.raw +
           '</td><td class="' + cls + '">' + c.score.toFixed(0) +
           "</td><td>" + ((c.effective_weight || 0) * 100).toFixed(0) + "%</td><td>" +
           c.contribution.toFixed(1) + "</td></tr>";

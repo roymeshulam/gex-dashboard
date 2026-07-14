@@ -121,3 +121,18 @@ def test_missing_market_changes_are_excluded_not_scored_as_zero():
     assert "vix_change" not in names
     assert result["volatility"]["score"] is None
     assert result["confidence"]["level"] == "Insufficient"
+
+
+def test_every_available_component_has_an_explanation():
+    result = sentiment.compute_sentiment(
+        _chain([
+            mk("P", 7200, oi=10, delta=-0.25, iv=0.20,
+               expiry=TODAY + datetime.timedelta(days=30)),
+            mk("C", 7600, oi=10, delta=0.25, iv=0.16,
+               expiry=TODAY + datetime.timedelta(days=30)),
+        ], change_pct=0.5, iv30_chg=2.0),
+        _totals(call_vol=100, put_vol=90), flip=7350.0,
+        vix=VixData(18.0, 1.0, TS), today=TODAY, zero_dte_share=0.0)
+    assert {c["name"] for c in result["components"]} == set(
+        sentiment.COMPONENT_DESCRIPTIONS)
+    assert all(c["description"].strip() for c in result["components"])

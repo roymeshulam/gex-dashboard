@@ -9,6 +9,50 @@ from ..models import ChainData, Contract, VixData
 from .gex import BN
 
 
+COMPONENT_DESCRIPTIONS = {
+    "gamma_regime": (
+        "Measures SPX's percentage distance from the repriced gamma flip. "
+        "Positive net GEX is associated with more stable, mean-reverting "
+        "conditions; negative net GEX can amplify moves."
+    ),
+    "pcr_volume": (
+        "Total put volume divided by total call volume across the chain. "
+        "Values above 1 mean more puts traded; values below 1 mean more calls. "
+        "Volume is unsigned, so it does not identify buying versus selling."
+    ),
+    "dex_tilt": (
+        "Net option delta exposure divided by total absolute call and put "
+        "delta exposure. Positive values indicate call-dominated directional "
+        "exposure; negative values indicate put-dominated exposure."
+    ),
+    "vix_change": (
+        "The VIX percentage change from the previous close. Rising VIX signals "
+        "increasing near-term expected volatility; falling VIX signals easing "
+        "volatility expectations."
+    ),
+    "pcr_oi": (
+        "Total put open interest divided by total call open interest. Higher "
+        "values indicate more outstanding put positioning. Open interest is "
+        "updated daily and does not reveal who owns each side."
+    ),
+    "iv_skew": (
+        "Approximately 30-day 25-delta put implied volatility minus comparable "
+        "call implied volatility, in volatility points. Higher skew indicates "
+        "richer downside protection and greater concern about downside risk."
+    ),
+    "price_momentum": (
+        "The current SPX percentage change from its previous close. Positive "
+        "values show bullish pressure today and negative values show bearish "
+        "pressure; this describes the current session rather than forecasting it."
+    ),
+    "iv30_change": (
+        "The percentage change in 30-day SPX implied volatility from the "
+        "previous close. Rising IV30 suggests expanding expected movement; "
+        "falling IV30 suggests contracting expected movement."
+    ),
+}
+
+
 def _clamp(x: float) -> float:
     return max(-1.0, min(1.0, x))
 
@@ -64,6 +108,7 @@ def compute_sentiment(chain: ChainData, gex_totals: dict, flip: Optional[float],
                    else config.VOLATILITY_WEIGHTS)
         target = direction_components if group == "direction" else volatility_components
         target.append({"name": name, "label": label, "group": group,
+                       "description": COMPONENT_DESCRIPTIONS[name],
                        "raw": raw, "score": round(score, 1),
                        "weight": weights[name]})
 
