@@ -130,10 +130,12 @@
     const d = state.data;
     if (!d) return;
     const s = d.status, m = d.meta;
-    const chgCls = s.change_pct >= 0 ? "pos" : "neg";
+    const chgCls = s.change_pct === null ? "" : s.change_pct >= 0 ? "pos" : "neg";
     const gexCls = s.total_gex_bn >= 0 ? "pos" : "neg";
-    const sentiCls = s.sentiment_score >= 15 ? "pos"
-      : s.sentiment_score <= -15 ? "neg" : "";
+    const directionCls = s.direction_score === null ? ""
+      : s.direction_score >= 15 ? "pos" : s.direction_score <= -15 ? "neg" : "";
+    const volatilityCls = s.volatility_score === null ? "warn"
+      : s.volatility_score >= 15 ? "neg" : s.volatility_score <= -15 ? "pos" : "";
     let html = "";
     html += chipHtml(d.symbol, Fmt.fmtStrike(s.spot) +
       ' <small class="' + chgCls + '">' + Fmt.fmtPct(s.change_pct) + "</small>");
@@ -147,8 +149,13 @@
     html += chipHtml("Put Δ", Fmt.fmtBn(s.put_dex_bn));
     html += chipHtml("P/C Vol", s.pcr_vol === null ? "—" : s.pcr_vol.toFixed(2));
     html += chipHtml("IV30", s.iv30 === null ? "—" : s.iv30.toFixed(1));
-    html += chipHtml("Sentiment", s.sentiment_score.toFixed(0) +
-      " · " + esc(s.sentiment_label), "", sentiCls);
+    html += chipHtml("Direction", s.direction_score === null ? "—" :
+      s.direction_score.toFixed(0) + " · " + esc(s.direction_label), "", directionCls);
+    html += chipHtml("Volatility", s.volatility_score === null ? "—" :
+      s.volatility_score.toFixed(0) + " · " + esc(s.volatility_label), "", volatilityCls);
+    html += chipHtml("Confidence", esc(s.confidence || "—"),
+      s.confidence === "Medium" ? "" : "warn",
+      s.confidence === "Medium" ? "" : "warn");
     const mkt = m.market || {};
     html += chipHtml("Market", esc((mkt.session || "?").toUpperCase()) +
       " · " + esc(mkt.ny_time || "") + " ET");
@@ -274,17 +281,35 @@
   function renderSentimentView() {
     const sn = state.data.views.sentiment;
     if (!sn) return;
-    Charts.renderGauge($("chart-gauge"), sn.score, sn.label);
+    const direction = sn.direction || { score: sn.score, label: sn.label, components: [] };
+    const volatility = sn.volatility || { score: null, label: "Insufficient data", components: [] };
+    Charts.renderGauge($("chart-direction"), direction.score, direction.label);
+    Charts.renderGauge($("chart-volatility"), volatility.score, volatility.label,
+      { positiveIsRisk: true });
 
     $("sentiComponents").innerHTML =
-      "<tr><th>Component</th><th>Raw</th><th>Score</th><th>Weight</th><th>Contrib</th></tr>" +
+      "<tr><th>Type</th><th>Component</th><th>Raw</th><th>Score</th><th>Effective weight</th><th>Contrib</th></tr>" +
       sn.components.map((c) => {
-        const cls = c.score > 0 ? "pos" : c.score < 0 ? "neg" : "";
-        return "<tr><td>" + esc(c.label) + "</td><td>" + c.raw +
+        const riskScore = c.group === "volatility";
+        const cls = c.score > 0 ? (riskScore ? "neg" : "pos")
+          : c.score < 0 ? (riskScore ? "pos" : "neg") : "";
+        return "<tr><td>" + esc(c.group === "volatility" ? "Volatility" : "Direction") +
+          "</td><td>" + esc(c.label) + "</td><td>" + c.raw +
           '</td><td class="' + cls + '">' + c.score.toFixed(0) +
-          "</td><td>" + (c.weight * 100).toFixed(0) + "%</td><td>" +
+          "</td><td>" + ((c.effective_weight || 0) * 100).toFixed(0) + "%</td><td>" +
           c.contribution.toFixed(1) + "</td></tr>";
       }).join("");
+
+    const confidence = sn.confidence || { level: "—", disclosures: [] };
+    $("sentiConfidence").innerHTML =
+      '<div class="confidence-summary">Data confidence: <b class="' +
+      (confidence.level === "Medium" ? "" : "warn") + '">' +
+      esc(confidence.level) + "</b> · Direction coverage " +
+      (direction.coverage_pct === undefined ? "—" : direction.coverage_pct + "%") +
+      " · Volatility coverage " +
+      (volatility.coverage_pct === undefined ? "—" : volatility.coverage_pct + "%") +
+      "%</div><ul>" + (confidence.disclosures || []).map((item) =>
+        "<li>" + esc(item) + "</li>").join("") + "</ul>";
 
     const mm = sn.metrics;
     const card = (k, v, cls) =>
@@ -294,7 +319,7 @@
       card("VIX", (mm.vix === null ? "—" : mm.vix) +
         ' <small class="' + (mm.vix_change_pct > 0 ? "neg" : "pos") + '">' +
         Fmt.fmtPct(mm.vix_change_pct) + "</small>") +
-      card("IV30", mm.iv30 + ' <small class="' +
+      card("IV30", (mm.iv30 === null ? "—" : mm.iv30) + ' <small class="' +
         (mm.iv30_change_pct > 0 ? "neg" : "pos") + '">' +
         Fmt.fmtPct(mm.iv30_change_pct) + "</small>") +
       card("Max Pain (" + Fmt.fmtExpiry(mm.max_pain_expiry) + ")",

@@ -7,7 +7,7 @@
   <link rel="icon" href="/favicon.ico" sizes="any">
   <link rel="icon" type="image/png" href="/favicon-32.png" sizes="32x32">
   <link rel="apple-touch-icon" href="/apple-touch-icon.png">
-  <link rel="stylesheet" href="/css/style.css?v=7">
+  <link rel="stylesheet" href="/css/style.css?v=8">
   <style>
     .doc { max-width: 760px; margin: 0 auto; padding: 20px 16px 60px; }
     .doc h1 { font-size: 22px; }
@@ -61,10 +61,11 @@
         (resistance / pin candidate).</li>
       <li><b>Put Wall</b> — strike with the largest negative net GEX
         (support / acceleration zone if lost).</li>
-      <li><b>Gamma Flip</b> — interpolated level where the cumulative net GEX
-        profile changes sign; above it the market tends to be in positive
-        gamma, below it negative. It can be absent when one side dominates the
-        whole chain.</li>
+      <li><b>Gamma Flip</b> — estimated SPX price where aggregate GEX crosses
+        zero after each contract's gamma is repriced across hypothetical spot
+        prices. It separates modeled positive- and negative-gamma regions; the
+        current regime card shows which side SPX occupies. It can be absent
+        when exposure stays one-sided throughout the search range.</li>
     </ul>
 
     <h2>0DTE</h2>
@@ -80,21 +81,21 @@
     bearish; combine it with the heatmap and strike map.</p>
 
     <h2>Sentiment</h2>
-    <p>A weighted composite of eight indicators, each scored −100…+100:</p>
+    <p>The page separates current directional pressure from the modeled
+      volatility regime. These are market-state references, not statistically
+      validated forecasts.</p>
     <table>
-      <tr><th>Component</th><th>Weight</th><th>Bullish when…</th></tr>
-      <tr><td>Gamma regime (spot vs flip)</td><td>20%</td><td>spot well above the flip</td></tr>
-      <tr><td>Put/Call ratio (volume)</td><td>15%</td><td>calls outpace puts</td></tr>
-      <tr><td>Delta-exposure tilt</td><td>15%</td><td>net delta exposure positive</td></tr>
-      <tr><td>VIX day change</td><td>15%</td><td>VIX falling</td></tr>
-      <tr><td>Put/Call ratio (OI)</td><td>10%</td><td>below the ~1.2 index baseline</td></tr>
-      <tr><td>25Δ IV skew (~30 DTE)</td><td>10%</td><td>put skew below ~4 vol pts</td></tr>
-      <tr><td>Price momentum (day)</td><td>10%</td><td>underlying up on the day</td></tr>
-      <tr><td>IV30 day change</td><td>5%</td><td>implied vol falling</td></tr>
+      <tr><th>Reading</th><th>Components</th><th>Interpretation</th></tr>
+      <tr><td>Directional pressure</td><td>price change, put/call volume,
+        delta tilt, put/call OI</td><td>bullish, mixed, or bearish current pressure</td></tr>
+      <tr><td>Volatility regime</td><td>distance to repriced gamma flip,
+        VIX change, IV30 change, 25Δ skew</td><td>stable through high instability</td></tr>
     </table>
-    <p>Missing components (e.g. VIX feed down) are dropped and weights
-    renormalized. Labels: ≥+50 Strongly Bullish, +15…+50 Bullish, ±15 Neutral,
-    −15…−50 Bearish, ≤−50 Strongly Bearish.</p>
+    <p>Missing inputs are excluded rather than scored as zero. The page shows
+      effective weights, input coverage, and confidence. Confidence measures
+      data completeness only; it does not claim predictive accuracy. Even with
+      complete inputs, confidence is capped at Medium because quotes are
+      delayed, option volume is unsigned, and dealer positions are estimated.</p>
 
     <h2>A practical workflow</h2>
     <ul>

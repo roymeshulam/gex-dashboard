@@ -171,8 +171,8 @@
       // wall) don't overlap.
       level("SPOT", levels.spot, "#ffffff", "solid", "insideStartTop");
       level("FLIP", levels.flip, AMBER, "dashed", "insideStartBottom");
-      level("CALL WALL", levels.call_wall, GREEN, "dashed", "insideEndTop");
-      level("PUT WALL", levels.put_wall, RED, "dashed", "insideEndBottom");
+      level("CALL WALL", levels.call_wall, GREEN, "dashed", "insideStartTop");
+      level("PUT WALL", levels.put_wall, RED, "dashed", "insideStartBottom");
     }
 
     const series = [
@@ -230,7 +230,11 @@
 
   /* ---------------------- Sentiment gauge ---------------------- */
 
-  function renderGauge(el, score, label) {
+  function renderGauge(el, score, label, opts) {
+    opts = opts || {};
+    const colors = opts.positiveIsRisk
+      ? [[0.425, GREEN], [0.575, "#3a4254"], [1, RED]]
+      : [[0.425, RED], [0.575, "#3a4254"], [1, GREEN]];
     const inst = chart(el, 260);
     inst.setOption({
       animation: true,
@@ -239,7 +243,7 @@
         axisLine: {
           lineStyle: {
             width: 16,
-            color: [[0.425, RED], [0.575, "#3a4254"], [1, GREEN]],
+            color: colors,
           },
         },
         pointer: { itemStyle: { color: "#e3e8f2" }, length: "60%", width: 4 },
@@ -255,7 +259,7 @@
             l: { color: MUTED, fontSize: 12, padding: [4, 0, 0, 0] },
           },
         },
-        data: [{ value: score }],
+        data: [{ value: score === null || score === undefined ? 0 : score }],
       }],
     }, { notMerge: true });
     inst.resize();

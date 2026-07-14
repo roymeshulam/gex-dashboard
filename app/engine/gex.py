@@ -10,6 +10,7 @@ serialized in $ millions (1dp) to keep payloads small; totals in $ billions.
 from __future__ import annotations
 
 import datetime
+import math
 from collections import defaultdict
 from typing import Dict, List, Optional, Tuple
 
@@ -100,26 +101,81 @@ def find_walls(profile: List[dict]) -> Tuple[Optional[float], Optional[float]]:
     return call_wall, put_wall
 
 
-def find_flip(profile: List[dict], spot: float) -> Optional[float]:
-    """Zero-crossing of the cumulative net-GEX profile over ascending strikes,
-    linearly interpolated; with several crossings, the one nearest spot."""
-    if len(profile) < 2:
+def _bs_gamma(spot: float, strike: float, iv: float, years: float) -> float:
+    """Black-Scholes unit gamma using zero rates.
+
+    Rates and dividends have a small effect on the structural flip compared
+    with IV and time. Zero rates keep the estimate reproducible without
+    introducing another delayed external input.
+    """
+    if spot <= 0 or strike <= 0 or iv <= 0 or years <= 0:
+        return 0.0
+    vol_time = iv * math.sqrt(years)
+    d1 = (math.log(spot / strike) + 0.5 * iv * iv * years) / vol_time
+    density = math.exp(-0.5 * d1 * d1) / math.sqrt(2.0 * math.pi)
+    return density / (spot * vol_time)
+
+
+def _years_to_expiry(expiry: datetime.date, as_of: datetime.datetime) -> float:
+    """Approximate time remaining, retaining a half session for 0DTE."""
+    days = (expiry - as_of.date()).days
+    return max(days + 0.5, 0.5) / 365.0
+
+
+def net_gex_at_spot(contracts: List[Contract], candidate_spot: float,
+                    as_of: datetime.datetime,
+                    expiry: Optional[datetime.date] = None) -> float:
+    """Reprice gamma and aggregate assumed dealer GEX at a candidate spot."""
+    total = 0.0
+    for c in contracts:
+        if expiry is not None and c.expiry != expiry:
+            continue
+        if c.oi <= 0 or c.iv <= 0:
+            continue
+        gamma = _bs_gamma(
+            candidate_spot, c.strike, c.iv,
+            _years_to_expiry(c.expiry, as_of),
+        )
+        sign = 1.0 if c.cp == "C" else -1.0
+        total += (sign * gamma * c.oi * config.CONTRACT_MULTIPLIER
+                  * candidate_spot * candidate_spot * 0.01)
+    return total
+
+
+def find_gamma_flip(contracts: List[Contract], spot: float,
+                    as_of: datetime.datetime,
+                    expiry: Optional[datetime.date] = None) -> Optional[float]:
+    """Find the repriced aggregate-GEX zero nearest spot.
+
+    The search spans +/-20% around spot. Each bracketed crossing is refined by
+    bisection, and the crossing nearest current spot is returned.
+    """
+    eligible = [c for c in contracts
+                if (expiry is None or c.expiry == expiry) and c.oi > 0 and c.iv > 0]
+    if not eligible or spot <= 0:
         return None
+    lo, hi = spot * 0.8, spot * 1.2
+    steps = 160
+    points = [lo + (hi - lo) * i / steps for i in range(steps + 1)]
+    values = [net_gex_at_spot(eligible, value, as_of) for value in points]
     crossings = []
-    cum = 0.0
-    prev_cum = None
-    prev_strike = None
-    for row in profile:
-        cum += row["net_gex"]
-        if prev_cum is not None and (prev_cum < 0.0 <= cum or prev_cum > 0.0 >= cum):
-            denom = cum - prev_cum
-            if denom != 0.0:
-                k = prev_strike + (0.0 - prev_cum) * (row["strike"] - prev_strike) / denom
-                crossings.append(k)
-        prev_cum, prev_strike = cum, row["strike"]
+    for left, right, f_left, f_right in zip(points, points[1:], values, values[1:]):
+        if f_left == 0.0:
+            crossings.append(left)
+            continue
+        if f_left * f_right > 0.0:
+            continue
+        for _ in range(40):
+            mid = (left + right) / 2.0
+            f_mid = net_gex_at_spot(eligible, mid, as_of)
+            if f_left * f_mid <= 0.0:
+                right, f_right = mid, f_mid
+            else:
+                left, f_left = mid, f_mid
+        crossings.append((left + right) / 2.0)
     if not crossings:
         return None
-    return min(crossings, key=lambda k: abs(k - spot))
+    return min(crossings, key=lambda value: abs(value - spot))
 
 
 def _window(spot: float, window_pct: float) -> Tuple[float, float]:
@@ -211,19 +267,21 @@ def _bucketed_rows(contracts: List[Contract], spot: float, step: float,
     return rows
 
 
-def build_strikemap(contracts: List[Contract], spot: float, cfg: dict) -> dict:
+def build_strikemap(contracts: List[Contract], spot: float, cfg: dict,
+                    as_of: Optional[datetime.datetime] = None) -> dict:
     """Per-expiration strike ladders + walls/flip, plus summary tables."""
     expiries = _expiries(contracts, config.MAX_STRIKEMAP_EXPIRATIONS)
     step = choose_step(spot, cfg["window_pct"], cfg["steps"], config.MAX_HEATMAP_ROWS)
     lo, hi = _window(spot, cfg["window_pct"])
 
+    as_of = as_of or datetime.datetime.now(tz=datetime.timezone.utc)
     by_expiry: Dict[str, dict] = {}
     keys = ["ALL"] + [e.isoformat() for e in expiries]
     for key in keys:
         exp = None if key == "ALL" else datetime.date.fromisoformat(key)
         profile = strike_profile(contracts, spot, expiry=exp)
         call_wall, put_wall = find_walls(profile)
-        flip = find_flip(profile, spot)
+        flip = find_gamma_flip(contracts, spot, as_of, expiry=exp)
         by_expiry[key] = {
             "rows": _bucketed_rows(contracts, spot, step, lo, hi, expiry=exp),
             "call_wall": call_wall,
@@ -255,13 +313,15 @@ def build_strikemap(contracts: List[Contract], spot: float, cfg: dict) -> dict:
     }
 
 
-def build_expiry_levels(contracts: List[Contract], spot: float) -> Dict[str, dict]:
+def build_expiry_levels(contracts: List[Contract], spot: float,
+                        as_of: Optional[datetime.datetime] = None) -> Dict[str, dict]:
     """Wall and flip levels for every expiration in the chain."""
+    as_of = as_of or datetime.datetime.now(tz=datetime.timezone.utc)
     levels = {}
     for expiry in sorted({c.expiry for c in contracts}):
         profile = strike_profile(contracts, spot, expiry=expiry)
         call_wall, put_wall = find_walls(profile)
-        flip = find_flip(profile, spot)
+        flip = find_gamma_flip(contracts, spot, as_of, expiry=expiry)
         levels[expiry.isoformat()] = {
             "call_wall": call_wall,
             "flip": round(flip, 2) if flip is not None else None,
@@ -271,7 +331,8 @@ def build_expiry_levels(contracts: List[Contract], spot: float) -> Dict[str, dic
 
 
 def build_zero_dte(contracts: List[Contract], spot: float, cfg: dict,
-                   today: datetime.date) -> dict:
+                   today: datetime.date,
+                   as_of: Optional[datetime.datetime] = None) -> dict:
     """Same-day expiration roadmap; friendly empty state when none trades."""
     todays = [c for c in contracts if c.expiry == today]
     if not todays:
@@ -284,7 +345,9 @@ def build_zero_dte(contracts: List[Contract], spot: float, cfg: dict,
     lo, hi = _window(spot, config.ZERO_DTE_WINDOW_PCT)
     profile = strike_profile(todays, spot)
     call_wall, put_wall = find_walls(profile)
-    flip = find_flip(profile, spot)
+    as_of = as_of or datetime.datetime.combine(
+        today, datetime.time(12, 0), tzinfo=datetime.timezone.utc)
+    flip = find_gamma_flip(todays, spot, as_of, expiry=today)
 
     dte_vol = sum(c.volume for c in todays)
     total_vol = sum(c.volume for c in contracts)

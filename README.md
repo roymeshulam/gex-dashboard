@@ -82,11 +82,10 @@ notice and recovers automatically (~30–60 s).
 - `GEX = ±gamma × OI × 100 × spot² × 0.01` (calls +, puts −; $ per 1% move)
 - `DEX = delta × OI × 100 × spot`
 - **Call/Put wall** = strike with the max positive / min negative net GEX
-- **Gamma flip** = interpolated zero-crossing of the cumulative net-GEX
-  profile across strikes (can be absent when one side dominates the chain)
-- **Sentiment** = weighted composite of 8 indicators (gamma regime, P/C
-  volume & OI, delta-exposure tilt, VIX change, 25Δ IV skew, day momentum,
-  IV30 change) — see `app/engine/sentiment.py` and the in-app guide.
+- **Gamma flip** = zero-crossing of aggregate GEX after each contract's gamma
+  is repriced across hypothetical SPX prices
+- **Market state** = separate directional-pressure and volatility-regime
+  readings with missing-input coverage and explicit confidence disclosures
 
 ## Notes & limitations
 

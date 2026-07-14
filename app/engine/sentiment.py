@@ -1,9 +1,4 @@
-"""Sentiment composite: 8 weighted components scored -100..+100 each, plus
-informational metrics (VIX, IV30, max pain, 0DTE share...).
-
-Missing components (e.g. VIX fetch failed, no flip) are dropped and the
-remaining weights renormalized, so the composite is always comparable.
-"""
+"""Directional-pressure and volatility-regime market-state estimates."""
 from __future__ import annotations
 
 import datetime
@@ -59,90 +54,153 @@ def compute_sentiment(chain: ChainData, gex_totals: dict, flip: Optional[float],
                       vix: Optional[VixData], today: datetime.date,
                       zero_dte_share: float) -> dict:
     spot = chain.spot
-    components = []
+    direction_components = []
+    volatility_components = []
 
-    def add(name: str, label: str, raw, score: Optional[float]):
+    def add(group: str, name: str, label: str, raw, score: Optional[float]):
         if raw is None or score is None:
             return
-        components.append({"name": name, "label": label, "raw": raw,
-                           "score": round(score, 1),
-                           "weight": config.SENTIMENT_WEIGHTS[name]})
+        weights = (config.DIRECTION_WEIGHTS if group == "direction"
+                   else config.VOLATILITY_WEIGHTS)
+        target = direction_components if group == "direction" else volatility_components
+        target.append({"name": name, "label": label, "group": group,
+                       "raw": raw, "score": round(score, 1),
+                       "weight": weights[name]})
 
     # 1. Gamma regime: how far spot sits above/below the flip, in % of spot.
     if flip is not None and spot:
         dist = (spot - flip) / spot * 100.0
-        add("gamma_regime", "Gamma regime (spot vs flip)",
-            round(dist, 2), _clamp(dist / 1.5) * 100.0)
-    else:
-        sign = 1.0 if gex_totals["net_gex"] > 0 else -1.0
-        add("gamma_regime", "Gamma regime (net GEX sign)",
-            round(gex_totals["net_gex"] / BN, 2), sign * 100.0)
+        # Positive-GEX structure is stabilizing; negative GEX is destabilizing.
+        regime_sign = (-1.0 if gex_totals["net_gex"] > 0 else
+                       1.0 if gex_totals["net_gex"] < 0 else 0.0)
+        add("volatility", "gamma_regime", "Distance to gamma flip (%)",
+            round(dist, 2), regime_sign * _clamp(abs(dist) / 1.5) * 100.0)
 
     # 2. Put/Call volume ratio. 1.0 neutral; lower = call-heavy = bullish.
     if gex_totals["call_vol"] > 0:
         pcr_v = gex_totals["put_vol"] / gex_totals["call_vol"]
-        add("pcr_volume", "Put/Call ratio (volume)",
+        add("direction", "pcr_volume", "Put/Call ratio (volume)",
             round(pcr_v, 2), _clamp((1.0 - pcr_v) / 0.4) * 100.0)
 
     # 3. Net delta-exposure tilt.
     denom = gex_totals["call_dex"] + abs(gex_totals["put_dex"])
     if denom > 0:
         tilt = gex_totals["net_dex"] / denom
-        add("dex_tilt", "Delta exposure tilt", round(tilt, 3), _clamp(tilt) * 100.0)
+        add("direction", "dex_tilt", "Delta exposure tilt",
+            round(tilt, 3), _clamp(tilt) * 100.0)
 
     # 4. VIX day change (falling VIX = risk-on).
-    if vix is not None:
-        add("vix_change", "VIX day change %",
-            round(vix.change_pct, 2), _clamp(-vix.change_pct / 5.0) * 100.0)
+    if vix is not None and vix.change_pct is not None:
+        add("volatility", "vix_change", "VIX day change %",
+            round(vix.change_pct, 2), _clamp(vix.change_pct / 5.0) * 100.0)
 
     # 5. Put/Call OI ratio. Index baseline ~1.2 neutral.
     if gex_totals["call_oi"] > 0:
         pcr_oi = gex_totals["put_oi"] / gex_totals["call_oi"]
-        add("pcr_oi", "Put/Call ratio (OI)",
+        add("direction", "pcr_oi", "Put/Call ratio (OI)",
             round(pcr_oi, 2), _clamp((1.2 - pcr_oi) / 0.5) * 100.0)
 
     # 6. 25-delta IV skew (~30 DTE). ~4 pts is typical for index puts.
     skew = iv_skew_25d(chain.contracts, today)
     if skew is not None:
-        add("iv_skew", "25Δ IV skew (pts)",
-            round(skew, 2), _clamp((4.0 - skew) / 3.0) * 100.0)
+        add("volatility", "iv_skew", "25Δ IV skew (pts)",
+            round(skew, 2), _clamp((skew - 4.0) / 3.0) * 100.0)
 
     # 7. Underlying day momentum.
-    add("price_momentum", "Price day change %",
-        round(chain.change_pct, 2), _clamp(chain.change_pct / 1.0) * 100.0)
+    if chain.change_pct is not None:
+        add("direction", "price_momentum", "Price day change %",
+            round(chain.change_pct, 2), _clamp(chain.change_pct / 1.0) * 100.0)
 
     # 8. IV30 day change (vol bid = defensive).
-    add("iv30_change", "IV30 day change %",
-        round(chain.iv30_change_pct, 2), _clamp(-chain.iv30_change_pct / 8.0) * 100.0)
+    if chain.iv30_change_pct is not None:
+        add("volatility", "iv30_change", "IV30 day change %",
+            round(chain.iv30_change_pct, 2),
+            _clamp(chain.iv30_change_pct / 8.0) * 100.0)
 
-    wsum = sum(c["weight"] for c in components)
-    score = sum(c["score"] * c["weight"] for c in components) / wsum if wsum else 0.0
-    for c in components:
-        c["contribution"] = round(c["score"] * c["weight"] / wsum, 1) if wsum else 0.0
+    def aggregate(components: list, weights: dict, labels: tuple[str, ...]) -> dict:
+        available_weight = sum(c["weight"] for c in components)
+        score = (sum(c["score"] * c["weight"] for c in components)
+                 / available_weight if available_weight else None)
+        for c in components:
+            effective = c["weight"] / available_weight if available_weight else 0.0
+            c["effective_weight"] = round(effective, 3)
+            c["contribution"] = round(c["score"] * effective, 1)
+        if score is None:
+            label = "Insufficient data"
+        elif score >= 50:
+            label = labels[0]
+        elif score >= 15:
+            label = labels[1]
+        elif score > -15:
+            label = labels[2]
+        elif score > -50:
+            label = labels[3]
+        else:
+            label = labels[4]
+        coverage = available_weight / sum(weights.values())
+        confidence = "Medium" if coverage >= 0.85 else "Low" if coverage >= 0.6 else "Insufficient"
+        return {"score": round(score, 1) if score is not None else None,
+                "label": label, "components": components,
+                "coverage_pct": round(coverage * 100.0),
+                "confidence": confidence}
 
-    if score >= 50:
-        label = "Strongly Bullish"
-    elif score >= 15:
-        label = "Bullish"
-    elif score > -15:
-        label = "Neutral"
-    elif score > -50:
-        label = "Bearish"
-    else:
-        label = "Strongly Bearish"
+    direction = aggregate(
+        direction_components, config.DIRECTION_WEIGHTS,
+        ("Strong bullish pressure", "Bullish pressure", "Mixed",
+         "Bearish pressure", "Strong bearish pressure"),
+    )
+    volatility = aggregate(
+        volatility_components, config.VOLATILITY_WEIGHTS,
+        ("High instability", "Elevated instability", "Balanced",
+         "Stable", "Very stable"),
+    )
+
+    missing = []
+    present = {c["name"] for c in direction_components + volatility_components}
+    for name, label in (
+        ("gamma_regime", "gamma flip"), ("vix_change", "VIX change"),
+        ("iv30_change", "IV30 change"), ("iv_skew", "25-delta skew"),
+        ("price_momentum", "price change"), ("pcr_volume", "put/call volume"),
+        ("dex_tilt", "delta exposure"), ("pcr_oi", "put/call open interest"),
+    ):
+        if name not in present:
+            missing.append(label)
+    confidence_rank = {"Insufficient": 0, "Low": 1, "Medium": 2}
+    confidence_level = min(
+        (direction["confidence"], volatility["confidence"]),
+        key=lambda value: confidence_rank[value],
+    )
+    disclosures = [
+        "CBOE options quotes are delayed by about 15 minutes.",
+        "Dealer positioning is estimated from open interest, not observed.",
+        "Put/call volume is unsigned and does not identify buyers or sellers.",
+        "Market-state reference only; predictive performance is not validated.",
+    ]
+    if missing:
+        disclosures.append("Missing inputs: " + ", ".join(missing) + ".")
 
     nearest = min({c.expiry for c in chain.contracts}) if chain.contracts else None
     mp = max_pain(chain.contracts, nearest) if nearest else None
 
     return {
-        "score": round(score, 1),
-        "label": label,
-        "components": components,
+        # Legacy aliases retain API compatibility; they now reflect direction.
+        "score": direction["score"],
+        "label": direction["label"],
+        "components": direction_components + volatility_components,
+        "direction": direction,
+        "volatility": volatility,
+        "confidence": {
+            "level": confidence_level,
+            "missing_inputs": missing,
+            "disclosures": disclosures,
+        },
         "metrics": {
             "vix": round(vix.level, 2) if vix else None,
-            "vix_change_pct": round(vix.change_pct, 2) if vix else None,
-            "iv30": round(chain.iv30, 2),
-            "iv30_change_pct": round(chain.iv30_change_pct, 2),
+            "vix_change_pct": (round(vix.change_pct, 2)
+                               if vix and vix.change_pct is not None else None),
+            "iv30": round(chain.iv30, 2) if chain.iv30 is not None else None,
+            "iv30_change_pct": (round(chain.iv30_change_pct, 2)
+                                if chain.iv30_change_pct is not None else None),
             "max_pain": mp,
             "max_pain_expiry": nearest.isoformat() if nearest else None,
             "zero_dte_share_pct": zero_dte_share,

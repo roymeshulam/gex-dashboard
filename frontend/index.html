@@ -8,12 +8,12 @@
   <link rel="icon" href="/favicon.ico" sizes="any">
   <link rel="icon" type="image/png" href="/favicon-32.png" sizes="32x32">
   <link rel="apple-touch-icon" href="/apple-touch-icon.png">
-  <link rel="stylesheet" href="/css/style.css?v=7">
+  <link rel="stylesheet" href="/css/style.css?v=8">
   <script defer src="/js/vendor/echarts.min.js?v=5.5.1"></script>
   <script defer src="/js/format.js?v=5"></script>
   <script defer src="/js/api.js?v=5"></script>
-  <script defer src="/js/charts.js?v=5"></script>
-  <script defer src="/js/app.js?v=6"></script>
+  <script defer src="/js/charts.js?v=7"></script>
+  <script defer src="/js/app.js?v=7"></script>
 </head>
 <body>
   <header class="topbar">
@@ -96,13 +96,22 @@
     </section>
 
     <section id="panel-sentiment" class="panel hidden">
-      <div class="grid-senti">
-        <div class="card"><h3>Composite sentiment</h3>
-          <div class="chart-box gauge" id="chart-gauge"></div>
+      <div class="panel-note">Market-state reference, not a validated forecast.
+        Direction and volatility are evaluated separately; confidence reflects
+        input availability, not predictive accuracy.</div>
+      <div class="grid-2 sentiment-gauges">
+        <div class="card"><h3>Directional pressure</h3>
+          <div class="chart-box gauge" id="chart-direction"></div>
         </div>
-        <div class="card"><h3>Components</h3>
-          <div class="table-scroll"><table id="sentiComponents"></table></div>
+        <div class="card"><h3>Volatility regime</h3>
+          <div class="chart-box gauge" id="chart-volatility"></div>
         </div>
+      </div>
+      <div class="card"><h3>Components</h3>
+        <div class="table-scroll"><table id="sentiComponents"></table></div>
+      </div>
+      <div class="card confidence-card"><h3>Confidence &amp; limitations</h3>
+        <div id="sentiConfidence"></div>
       </div>
       <div class="metric-grid" id="sentiMetrics"></div>
     </section>

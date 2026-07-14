@@ -61,13 +61,16 @@ async def build_snapshot(client: httpx.AsyncClient, vix_cache: VixCache) -> dict
     gex_totals = gex_engine.totals(contracts, spot)
     all_profile = gex_engine.strike_profile(contracts, spot)
     call_wall, put_wall = gex_engine.find_walls(all_profile)
-    flip = gex_engine.find_flip(all_profile, spot)
+    flip = gex_engine.find_gamma_flip(contracts, spot, chain.last_trade_time)
     flip_r = round(flip, 2) if flip is not None else None
 
     heatmap = gex_engine.build_heatmap(contracts, spot, cfg)
-    strikemap = gex_engine.build_strikemap(contracts, spot, cfg)
-    levels = gex_engine.build_expiry_levels(contracts, spot)
-    zerodte = gex_engine.build_zero_dte(contracts, spot, cfg, today)
+    strikemap = gex_engine.build_strikemap(
+        contracts, spot, cfg, as_of=chain.last_trade_time)
+    levels = gex_engine.build_expiry_levels(
+        contracts, spot, as_of=chain.last_trade_time)
+    zerodte = gex_engine.build_zero_dte(
+        contracts, spot, cfg, today, as_of=chain.last_trade_time)
     flow = flow_engine.build_flow(contracts, spot, cfg)
     zshare = zerodte["stats"]["dte_share_pct"] if zerodte.get("available") else 0.0
     senti = sentiment_engine.compute_sentiment(
@@ -75,7 +78,7 @@ async def build_snapshot(client: httpx.AsyncClient, vix_cache: VixCache) -> dict
 
     status = {
         "spot": round(spot, 2),
-        "change_pct": round(chain.change_pct, 2),
+        "change_pct": round(chain.change_pct, 2) if chain.change_pct is not None else None,
         "total_gex_bn": round(gex_totals["net_gex"] / gex_engine.BN, 2),
         "regime": "positive" if gex_totals["net_gex"] >= 0 else "negative",
         "flip": flip_r,
@@ -86,9 +89,14 @@ async def build_snapshot(client: httpx.AsyncClient, vix_cache: VixCache) -> dict
         "net_dex_bn": round(gex_totals["net_dex"] / gex_engine.BN, 2),
         "pcr_vol": round(gex_totals["put_vol"] / gex_totals["call_vol"], 2)
                    if gex_totals["call_vol"] else None,
-        "iv30": round(chain.iv30, 2),
+        "iv30": round(chain.iv30, 2) if chain.iv30 is not None else None,
         "sentiment_score": senti["score"],
         "sentiment_label": senti["label"],
+        "direction_score": senti["direction"]["score"],
+        "direction_label": senti["direction"]["label"],
+        "volatility_score": senti["volatility"]["score"],
+        "volatility_label": senti["volatility"]["label"],
+        "confidence": senti["confidence"]["level"],
         "n_contracts": len(contracts),
     }
 

@@ -36,16 +36,19 @@ FETCH_BACKOFF = [0.5, 1.5]
 SKEW_TARGET_DTE = 30
 SKEW_TARGET_DELTA = 0.25
 
-# Sentiment composite weights (renormalized over available components).
-SENTIMENT_WEIGHTS = {
-    "gamma_regime": 0.20,
-    "pcr_volume": 0.15,
-    "dex_tilt": 0.15,
-    "vix_change": 0.15,
-    "pcr_oi": 0.10,
-    "iv_skew": 0.10,
-    "price_momentum": 0.10,
-    "iv30_change": 0.05,
+# Separate market-state weights (renormalized over available components).
+DIRECTION_WEIGHTS = {
+    "price_momentum": 0.40,
+    "pcr_volume": 0.25,
+    "dex_tilt": 0.20,
+    "pcr_oi": 0.15,
+}
+
+VOLATILITY_WEIGHTS = {
+    "gamma_regime": 0.40,
+    "vix_change": 0.25,
+    "iv30_change": 0.20,
+    "iv_skew": 0.15,
 }
 
 USER_AGENT = "Mozilla/5.0 (gex-dashboard; educational; local use)"

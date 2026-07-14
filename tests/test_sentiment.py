@@ -57,36 +57,39 @@ def test_pcr_component_neutral_and_bullish():
     assert pcr["score"] == 100.0
 
 
-def test_vix_component_present_and_renormalization():
+def test_vix_component_present_and_volatility_renormalization():
     vix = VixData(level=20.0, change_pct=-5.0, ts=TS)
     with_vix = sentiment.compute_sentiment(
         _chain([]), _totals(), flip=7300.0, vix=vix, today=TODAY, zero_dte_share=0.0)
     names = [c["name"] for c in with_vix["components"]]
     assert "vix_change" in names
     vc = next(c for c in with_vix["components"] if c["name"] == "vix_change")
-    assert vc["score"] == 100.0  # -(-5)/5 = +1 -> +100
+    assert vc["score"] == -100.0  # falling VIX indicates greater stability
 
     without_vix = sentiment.compute_sentiment(
         _chain([]), _totals(), flip=7300.0, vix=None, today=TODAY, zero_dte_share=0.0)
     assert "vix_change" not in [c["name"] for c in without_vix["components"]]
-    # contributions sum to the composite either way
+    # Each group is independently normalized.
     for s in (with_vix, without_vix):
-        assert abs(sum(c["contribution"] for c in s["components"]) - s["score"]) < 0.5
+        for group in (s["direction"], s["volatility"]):
+            assert abs(sum(c["contribution"] for c in group["components"])
+                       - group["score"]) < 0.5
 
 
-def test_gamma_regime_above_flip_is_bullish():
+def test_gamma_regime_above_flip_is_stable():
     s = sentiment.compute_sentiment(
         _chain([]), _totals(), flip=7250.0, vix=None, today=TODAY, zero_dte_share=0.0)
     g = next(c for c in s["components"] if c["name"] == "gamma_regime")
-    assert g["score"] == 100.0  # spot 2% above flip, saturates at 1.5%
+    assert g["score"] == -100.0  # spot 2% above flip, saturates as stable
 
 
-def test_gamma_regime_fallback_sign():
+def test_missing_flip_is_not_replaced_with_maximum_bearish_score():
     s = sentiment.compute_sentiment(
         _chain([]), _totals(net_gex=-5e9), flip=None, vix=None,
         today=TODAY, zero_dte_share=0.0)
-    g = next(c for c in s["components"] if c["name"] == "gamma_regime")
-    assert g["score"] == -100.0
+    assert "gamma_regime" not in [c["name"] for c in s["components"]]
+    assert "gamma flip" in s["confidence"]["missing_inputs"]
+    assert s["volatility"]["confidence"] != "Medium"
 
 
 def test_labels():
@@ -94,4 +97,27 @@ def test_labels():
         _chain([], change_pct=2.0), _totals(call_vol=100, put_vol=40),
         flip=7200.0, vix=VixData(20.0, -6.0, TS), today=TODAY, zero_dte_share=0.0)
     assert bull["score"] > 15
-    assert bull["label"] in ("Bullish", "Strongly Bullish")
+    assert bull["label"] in ("Bullish pressure", "Strong bullish pressure")
+
+
+def test_direction_and_volatility_are_separate_scores():
+    result = sentiment.compute_sentiment(
+        _chain([], change_pct=1.0, iv30_chg=8.0),
+        _totals(call_vol=100, put_vol=60), flip=7500.0,
+        vix=VixData(20.0, 5.0, TS), today=TODAY, zero_dte_share=0.0)
+    assert result["direction"]["score"] > 0
+    assert result["volatility"]["score"] > 0
+    assert result["direction"]["label"] != result["volatility"]["label"]
+
+
+def test_missing_market_changes_are_excluded_not_scored_as_zero():
+    result = sentiment.compute_sentiment(
+        _chain([], change_pct=None, iv30=None, iv30_chg=None),
+        _totals(), flip=None, vix=VixData(20.0, None, TS),
+        today=TODAY, zero_dte_share=0.0)
+    names = {c["name"] for c in result["components"]}
+    assert "price_momentum" not in names
+    assert "iv30_change" not in names
+    assert "vix_change" not in names
+    assert result["volatility"]["score"] is None
+    assert result["confidence"]["level"] == "Insufficient"

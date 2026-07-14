@@ -77,6 +77,16 @@ def _f(v) -> float:
         return 0.0
 
 
+def _optional_f(v) -> Optional[float]:
+    """Preserve missing market fields instead of silently treating them as 0."""
+    if v is None or v == "":
+        return None
+    try:
+        return float(v)
+    except (TypeError, ValueError):
+        return None
+
+
 def normalize(raw: dict, today: Optional[datetime.date] = None) -> ChainData:
     """Raw CBOE JSON -> ChainData. Filters to SPX OCC roots, drops
     expired contracts, coerces missing numerics to 0. The (large) raw dict is
@@ -128,8 +138,9 @@ def normalize(raw: dict, today: Optional[datetime.date] = None) -> ChainData:
 
     return ChainData(
         symbol="SPX", spot=spot,
-        change_pct=_f(data.get("price_change_percent")),
-        iv30=_f(data.get("iv30")), iv30_change_pct=_f(data.get("iv30_change_percent")),
+        change_pct=_optional_f(data.get("price_change_percent")),
+        iv30=_optional_f(data.get("iv30")),
+        iv30_change_pct=_optional_f(data.get("iv30_change_percent")),
         data_ts=data_ts, last_trade_time=ltt, contracts=contracts,
     )
 
@@ -169,4 +180,5 @@ async def fetch_vix(client: httpx.AsyncClient) -> VixData:
         raise CboeParseError(f"unexpected VIX schema: {e}")
     if not level:
         raise CboeParseError("no usable VIX level")
-    return VixData(level=level, change_pct=_f(data.get("price_change_percent")), ts=ts)
+    return VixData(level=level,
+                   change_pct=_optional_f(data.get("price_change_percent")), ts=ts)

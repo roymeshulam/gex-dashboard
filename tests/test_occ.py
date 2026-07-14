@@ -66,6 +66,16 @@ def test_normalize_spot_fallback(mini_chain_raw):
     assert chain.spot == 7419.0  # prev_day_close
 
 
+def test_normalize_preserves_missing_market_changes(mini_chain_raw):
+    mini_chain_raw["data"]["price_change_percent"] = None
+    mini_chain_raw["data"]["iv30"] = None
+    mini_chain_raw["data"]["iv30_change_percent"] = "bad"
+    chain = cboe.normalize(mini_chain_raw, today=datetime.date(2026, 6, 9))
+    assert chain.change_pct is None
+    assert chain.iv30 is None
+    assert chain.iv30_change_pct is None
+
+
 def test_normalize_rejects_bad_schema():
     with pytest.raises(cboe.CboeParseError):
         cboe.normalize({"nope": 1})

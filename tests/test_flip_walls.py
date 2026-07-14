@@ -1,6 +1,9 @@
 from __future__ import annotations
 
+import datetime
+
 from app.engine import gex
+from tests.conftest import mk
 
 
 def _row(strike, net):
@@ -8,23 +11,30 @@ def _row(strike, net):
             "put_gex": min(net, 0.0), "net_gex": net}
 
 
-def test_flip_interpolation():
-    # cum: -100M @5900 -> +300M @5950; zero crossing at 5912.5
-    profile = [_row(5900.0, -100e6), _row(5950.0, +400e6)]
-    assert gex.find_flip(profile, spot=5920.0) == 5912.5
+AS_OF = datetime.datetime(2026, 6, 9, 12, tzinfo=datetime.timezone.utc)
+EXPIRY = datetime.date(2026, 7, 9)
 
 
-def test_flip_none_when_one_sided():
-    profile = [_row(5900.0, 50e6), _row(5950.0, 60e6)]
-    assert gex.find_flip(profile, spot=5920.0) is None
+def test_gamma_flip_reprices_contract_gamma_across_spot():
+    contracts = [
+        mk("P", 90, oi=100, iv=0.20, expiry=EXPIRY),
+        mk("C", 110, oi=100, iv=0.20, expiry=EXPIRY),
+    ]
+    flip = gex.find_gamma_flip(contracts, spot=100.0, as_of=AS_OF)
+    assert flip is not None
+    assert 98.0 < flip < 102.0
+    assert abs(gex.net_gex_at_spot(contracts, flip, AS_OF)) < 1.0
 
 
-def test_flip_multiple_crossings_picks_nearest_spot():
-    # cum: -10 @100, +10 @110 (cross ~105), -10 @120 (cross ~115), +10 @130 (cross ~125)
-    profile = [_row(100.0, -10e6), _row(110.0, 20e6),
-               _row(120.0, -20e6), _row(130.0, 20e6)]
-    flip = gex.find_flip(profile, spot=124.0)
-    assert 120.0 < flip < 130.0
+def test_gamma_flip_none_when_exposure_is_one_sided():
+    contracts = [mk("C", 100, oi=100, iv=0.20, expiry=EXPIRY)]
+    assert gex.find_gamma_flip(contracts, spot=100.0, as_of=AS_OF) is None
+
+
+def test_gamma_flip_ignores_contracts_without_iv_or_oi():
+    contracts = [mk("C", 100, oi=100, iv=0.0, expiry=EXPIRY),
+                 mk("P", 100, oi=0, iv=0.2, expiry=EXPIRY)]
+    assert gex.find_gamma_flip(contracts, spot=100.0, as_of=AS_OF) is None
 
 
 def test_walls():

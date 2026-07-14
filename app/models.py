@@ -3,7 +3,7 @@ from __future__ import annotations
 
 import datetime
 from dataclasses import dataclass, field
-from typing import List
+from typing import List, Optional
 
 
 @dataclass
@@ -26,9 +26,9 @@ class Contract:
 class ChainData:
     symbol: str
     spot: float
-    change_pct: float
-    iv30: float               # percent points (16.1)
-    iv30_change_pct: float
+    change_pct: Optional[float]
+    iv30: Optional[float]               # percent points (16.1)
+    iv30_change_pct: Optional[float]
     data_ts: datetime.datetime        # tz-aware (ET source)
     last_trade_time: datetime.datetime  # tz-aware (ET source)
     contracts: List[Contract] = field(default_factory=list)
@@ -37,5 +37,5 @@ class ChainData:
 @dataclass
 class VixData:
     level: float
-    change_pct: float
+    change_pct: Optional[float]
     ts: datetime.datetime
