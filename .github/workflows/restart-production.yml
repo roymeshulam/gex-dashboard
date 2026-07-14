@@ -25,6 +25,8 @@ jobs:
         env:
           DEPLOY_PASSWORD: ${{ secrets.DEPLOY_PASSWORD }}
           DEPLOY_KNOWN_HOSTS: ${{ secrets.DEPLOY_KNOWN_HOSTS }}
+          DEPLOY_HOST: ${{ secrets.DEPLOY_HOST }}
+          DEPLOY_USERNAME: ${{ secrets.DEPLOY_USERNAME }}
         run: |
           test -n "$DEPLOY_PASSWORD" || {
             echo "DEPLOY_PASSWORD is not configured" >&2
@@ -34,11 +36,21 @@ jobs:
             echo "DEPLOY_KNOWN_HOSTS is not configured" >&2
             exit 1
           }
+          test -n "$DEPLOY_HOST" || {
+            echo "DEPLOY_HOST is not configured" >&2
+            exit 1
+          }
+          test -n "$DEPLOY_USERNAME" || {
+            echo "DEPLOY_USERNAME is not configured" >&2
+            exit 1
+          }
 
-      - name: Install SSH password helper
+      - name: Ensure SSH password helper is available
         run: |
-          sudo apt-get update
-          sudo apt-get install --yes sshpass
+          if ! command -v sshpass >/dev/null 2>&1; then
+            sudo apt-get update
+            sudo apt-get install --yes sshpass
+          fi
 
       - name: Configure trusted host key
         env:
@@ -51,13 +63,15 @@ jobs:
       - name: Update, restart, and verify gex-dashboard
         env:
           SSHPASS: ${{ secrets.DEPLOY_PASSWORD }}
+          DEPLOY_HOST: ${{ secrets.DEPLOY_HOST }}
+          DEPLOY_USERNAME: ${{ secrets.DEPLOY_USERNAME }}
         run: |
           sshpass -e ssh \
             -p 22 \
             -o ConnectTimeout=15 \
             -o PasswordAuthentication=yes \
             -o StrictHostKeyChecking=yes \
-            meshulro@176.57.150.218 \
+            "${DEPLOY_USERNAME}@${DEPLOY_HOST}" \
             'bash -se' <<'REMOTE'
           export XDG_RUNTIME_DIR="/run/user/$(id -u)"
           working_dir="$(systemctl --user show gex-dashboard --property=WorkingDirectory --value)"
