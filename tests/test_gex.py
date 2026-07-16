@@ -91,6 +91,21 @@ def test_expiry_dropdowns_include_thirty_expirations():
     assert option_flow["expiries"][-1] == (start + datetime.timedelta(days=29)).isoformat()
 
 
+def test_flow_includes_open_interest_and_available_bid_ask_spreads():
+    cs = [
+        mk("C", 7400, oi=100, volume=0, bid=1.0, ask=1.4),
+        mk("C", 7400, oi=200, volume=0, bid=2.0, ask=2.2),
+        mk("P", 7400, oi=300, volume=0, bid=0.0, ask=0.1),
+        mk("P", 7400, oi=400, volume=0, bid=0.0, ask=0.0),
+    ]
+
+    row = flow.build_flow(cs, 7400.0, config.SPX)["by_expiry"]["ALL"]["rows"][0]
+
+    assert row[5:7] == [300, 700]
+    assert row[7] == 0.3
+    assert row[8] == 0.1
+
+
 def test_zero_dte_empty_state():
     cs = [mk("C", 7400, gamma=0.001, oi=10, expiry=EXP_A)]
     z = gex.build_zero_dte(cs, 7400.0, config.SPX,

@@ -251,12 +251,17 @@
       b.classList.toggle("active", b.dataset.mode === state.flowMode));
 
     const cur = f.by_expiry[state.flowExpiry];
-    const rows = state.flowMode === "vol"
-      ? cur.rows.map((r) => [r[0], r[1], -r[2]])
-      : cur.rows.map((r) => [r[0], r[3], -r[4]]);
+    const rowIndexes = {
+      vol: [1, 2], prem: [3, 4], oi: [5, 6], spread: [7, 8],
+    };
+    const indexes = rowIndexes[state.flowMode] || rowIndexes.vol;
+    const rows = cur.rows.map((r) => [r[0], r[indexes[0]], r[indexes[1]]]);
+    const fmt = state.flowMode === "spread" ? "price"
+      : state.flowMode === "prem" ? "money"
+        : "count";
     Charts.renderTornado($("chart-flow"), rows,
       { spot: state.data.status.spot },
-      { fmt: state.flowMode === "vol" ? "count" : "money", showNet: false });
+      { fmt, showNet: false });
 
     const t = f.totals;
     $("flowTotals").innerHTML =

@@ -42,9 +42,7 @@ def build_flow(contracts: List[Contract], spot: float, cfg: dict) -> dict:
         for c in contracts:
             if expiry is not None and c.expiry != expiry:
                 continue
-            if c.volume <= 0:
-                continue
-            p = premium(c)
+            p = premium(c) if c.volume > 0 else 0.0
             if c.cp == "C":
                 tot["call_vol"] += c.volume
                 tot["call_prem"] += p
@@ -53,18 +51,38 @@ def build_flow(contracts: List[Contract], spot: float, cfg: dict) -> dict:
                 tot["put_prem"] += p
             if not (lo <= c.strike <= hi):
                 continue
+            # A zero ask is an absent/unusable quote. A zero bid can still be
+            # a valid penny-option quote, so retain it when the ask is quoted.
+            has_spread = c.ask > 0.0 and c.ask >= c.bid
+            if c.volume <= 0 and c.oi <= 0 and not has_spread:
+                continue
             b = bucket_strike(c.strike, step)
-            row = acc.setdefault(b, [b, 0, 0, 0.0, 0.0])
+            # strike, call/put volume, call/put premium, call/put OI,
+            # call/put spread sums and quote counts
+            row = acc.setdefault(b, [b, 0, 0, 0.0, 0.0, 0, 0, 0.0, 0.0, 0, 0])
             if c.cp == "C":
                 row[1] += c.volume
                 row[3] += p
+                row[5] += c.oi
+                if has_spread:
+                    row[7] += c.ask - c.bid
+                    row[9] += 1
             else:
                 row[2] += c.volume
                 row[4] += p
+                row[6] += c.oi
+                if has_spread:
+                    row[8] += c.ask - c.bid
+                    row[10] += 1
         rows = []
         for b in sorted(acc, reverse=True):
             r = acc[b]
-            rows.append([r[0], r[1], r[2], round(r[3] / M, 2), round(r[4] / M, 2)])
+            rows.append([
+                r[0], r[1], r[2], round(r[3] / M, 2), round(r[4] / M, 2),
+                r[5], r[6],
+                round(r[7] / r[9], 4) if r[9] else None,
+                round(r[8] / r[10], 4) if r[10] else None,
+            ])
         return {
             "rows": rows,
             "call_vol": tot["call_vol"], "put_vol": tot["put_vol"],

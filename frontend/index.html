@@ -83,12 +83,15 @@
         <span id="flowModeBtns" class="seg">
           <button data-mode="vol" class="active">Volume</button>
           <button data-mode="prem">Premium</button>
+          <button data-mode="oi">Open interest</button>
+          <button data-mode="spread">Bid–ask spread</button>
         </span>
       </div>
       <div class="panel-controls"><span id="flowTotals" class="chips-inline"></span></div>
       <div class="panel-note">Side classification is a heuristic on the last
         trade vs the current delayed quote (at/above ask = buy, at/below bid =
-        sell) — treat as an estimate, not tape-true aggressor data.</div>
+        sell) — treat as an estimate, not tape-true aggressor data. Bid–ask
+        spreads are averages of available delayed quotes at each strike.</div>
       <div class="chart-box" id="chart-flow"></div>
       <div class="card"><h3>Largest contracts by traded premium</h3>
         <div class="table-scroll"><table id="topTrades"></table></div>

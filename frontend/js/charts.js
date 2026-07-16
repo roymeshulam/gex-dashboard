@@ -141,11 +141,12 @@
   /* -------- Horizontal tornado: GEX by strike or flow by strike -------- */
   // rows: [[strike, callVal, putVal, (netVal)] ...] strikes DESC.
   // levels: {spot, flip, call_wall, put_wall} (nulls ok)
-  // opts: {fmt: 'money'|'count', showNet: bool, title}
+  // opts: {fmt: 'money'|'count'|'price', showNet: bool, title}
 
   function renderTornado(el, rows, levels, opts) {
     opts = opts || {};
-    const fmt = opts.fmt === "count" ? Fmt.fmtCount : Fmt.fmtM;
+    const fmt = opts.fmt === "count" ? Fmt.fmtCount
+      : opts.fmt === "price" ? Fmt.fmtPrice : Fmt.fmtM;
     const strikes = rows.map((r) => r[0]);
     const cats = strikes.map(Fmt.fmtStrike);
     const calls = rows.map((r) => r[1]);

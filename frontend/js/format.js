@@ -26,6 +26,11 @@
     return String(n);
   }
 
+  function fmtPrice(n) {
+    if (n === null || n === undefined || isNaN(n)) return "—";
+    return "$" + Number(n).toFixed(2);
+  }
+
   function fmtPct(p, dp) {
     if (p === null || p === undefined || isNaN(p)) return "—";
     return (p > 0 ? "+" : "") + p.toFixed(dp === undefined ? 2 : dp) + "%";
@@ -68,6 +73,6 @@
   }
 
   window.Fmt = {
-    fmtM, fmtBn, fmtCount, fmtPct, fmtStrike, fmtExpiry, fmtExpiryDte, fmtTime,
+    fmtM, fmtBn, fmtCount, fmtPrice, fmtPct, fmtStrike, fmtExpiry, fmtExpiryDte, fmtTime,
   };
 })();
