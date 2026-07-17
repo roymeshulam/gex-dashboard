@@ -16,7 +16,7 @@ log = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/api")
 
-VIEWS = {"summary", "heatmap", "strikemap", "flow", "sentiment", "zerodte"}
+VIEWS = {"summary", "heatmap", "strikemap", "flow", "sentiment", "volatility", "zerodte"}
 NONNEGATIVE_INTEGER = re.compile(r"^\d+$")
 
 

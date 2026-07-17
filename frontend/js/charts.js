@@ -6,6 +6,7 @@
   const GREEN = "#089981";
   const RED = "#f23645";
   const AMBER = "#f5a623";
+  const BLUE = "#4da3ff";
   const TEXT = "#d7dde8";
   const MUTED = "#7a849a";
   const BG_CELL = "#141927";
@@ -174,6 +175,10 @@
       level("FLIP", levels.flip, AMBER, "dashed", "insideStartBottom");
       level("CALL WALL", levels.call_wall, GREEN, "dashed", "insideStartTop");
       level("PUT WALL", levels.put_wall, RED, "dashed", "insideStartBottom");
+      level("EXPECTED MOVE −", levels.expected_move_lower, AMBER, "solid", "insideStartTop");
+      level("EXPECTED MOVE +", levels.expected_move_upper, AMBER, "solid", "insideStartTop");
+      level("1 SD −", levels.sd_lower, BLUE, "dashed", "insideStartTop");
+      level("1 SD +", levels.sd_upper, BLUE, "dashed", "insideStartTop");
     }
 
     const series = [
@@ -297,5 +302,94 @@
     inst.resize();
   }
 
-  window.Charts = { renderHeatmap, renderTornado, renderGauge, renderMiniBar };
+  function renderIvTermStructure(el, rows) {
+    const inst = chart(el, 460);
+    inst.setOption({
+      animation: false,
+      grid: { left: 62, right: 22, top: 28, bottom: 55 },
+      tooltip: {
+        trigger: "axis", backgroundColor: "#11151f", borderColor: "#1d2433",
+        textStyle: baseText(),
+        formatter: (ps) => {
+          const row = rows[ps[0].dataIndex];
+          return "<b>" + Fmt.fmtExpiry(row.expiry) + " · " + row.dte +
+            " DTE</b><br>ATM IV: <b>" + row.atm_iv_pct.toFixed(2) + "%</b>";
+        },
+      },
+      xAxis: {
+        type: "value", name: "DTE", nameLocation: "middle", nameGap: 34,
+        min: 0,
+        axisLabel: { color: MUTED, fontSize: 10 },
+        axisLine: { lineStyle: { color: "#1d2433" } },
+        splitLine: { lineStyle: { color: "#161b29" } },
+      },
+      yAxis: {
+        type: "value", name: "ATM IV", nameTextStyle: { color: MUTED },
+        axisLabel: { color: MUTED, fontSize: 10, formatter: (v) => v.toFixed(1) + "%" },
+        splitLine: { lineStyle: { color: "#161b29" } },
+        scale: true,
+      },
+      series: [{
+        name: "ATM IV", type: "line", smooth: false, showSymbol: true,
+        symbolSize: 7, data: rows.map((r) => [r.dte, r.atm_iv_pct]),
+        lineStyle: { color: BLUE, width: 2 },
+        itemStyle: { color: BLUE },
+        areaStyle: { color: "rgba(77,163,255,0.10)" },
+      }],
+    }, { notMerge: true });
+    inst.resize();
+  }
+
+  function renderExpectedMoveTermStructure(el, rows) {
+    const inst = chart(el, 460);
+    inst.setOption({
+      animation: false,
+      grid: { left: 72, right: 22, top: 44, bottom: 55 },
+      legend: {
+        top: 4, textStyle: { color: MUTED, fontSize: 10 },
+        data: ["Upper expected move", "Lower expected move"],
+      },
+      tooltip: {
+        trigger: "axis", backgroundColor: "#11151f", borderColor: "#1d2433",
+        textStyle: baseText(),
+        formatter: (ps) => {
+          const row = rows[ps[0].dataIndex];
+          return "<b>" + Fmt.fmtExpiry(row.expiry) + " · " + row.dte +
+            " DTE</b><br>Upper: <b>" + Fmt.fmtStrike(row.upper) +
+            "</b><br>Lower: <b>" + Fmt.fmtStrike(row.lower) + "</b>";
+        },
+      },
+      xAxis: {
+        type: "value", name: "DTE", nameLocation: "middle", nameGap: 34,
+        min: 0,
+        axisLabel: { color: MUTED, fontSize: 10 },
+        axisLine: { lineStyle: { color: "#1d2433" } },
+        splitLine: { lineStyle: { color: "#161b29" } },
+      },
+      yAxis: {
+        type: "value", name: "Expected-move strike",
+        nameTextStyle: { color: MUTED }, scale: true,
+        axisLabel: { color: MUTED, fontSize: 10, formatter: Fmt.fmtStrike },
+        splitLine: { lineStyle: { color: "#161b29" } },
+      },
+      series: [
+        {
+          name: "Upper expected move", type: "line", showSymbol: true,
+          symbolSize: 7, data: rows.map((r) => [r.dte, r.upper]),
+          lineStyle: { color: GREEN, width: 2 }, itemStyle: { color: GREEN },
+        },
+        {
+          name: "Lower expected move", type: "line", showSymbol: true,
+          symbolSize: 7, data: rows.map((r) => [r.dte, r.lower]),
+          lineStyle: { color: RED, width: 2 }, itemStyle: { color: RED },
+        },
+      ],
+    }, { notMerge: true });
+    inst.resize();
+  }
+
+  window.Charts = {
+    renderHeatmap, renderTornado, renderGauge, renderMiniBar, renderIvTermStructure,
+    renderExpectedMoveTermStructure,
+  };
 })();

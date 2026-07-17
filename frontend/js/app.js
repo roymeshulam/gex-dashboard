@@ -4,13 +4,13 @@
   "use strict";
 
   const REFRESH_SEC = 30;
-  const VIEWS = ["heatmap", "strikemap", "zerodte", "flow", "sentiment"];
+  const VIEWS = ["heatmap", "strikemap", "zerodte", "flow", "sentiment", "volatility"];
 
   const state = {
     view: "heatmap",
     countdown: REFRESH_SEC, loading: false, abort: null,
     retries: 0, lastFetch: 0, data: null,
-    strikemapExpiry: "ALL", flowExpiry: "ALL", flowMode: "vol",
+    strikemapExpiry: null, flowExpiry: null, flowMode: "vol",
     wakeTimer: null,
   };
 
@@ -199,10 +199,11 @@
   function renderStrikemapView() {
     const sm = state.data.views.strikemap;
     if (!sm) return;
-    if (!sm.by_expiry[state.strikemapExpiry]) state.strikemapExpiry = "ALL";
+    if (!sm.expiries.includes(state.strikemapExpiry)) state.strikemapExpiry = sm.expiries[0];
+    if (!state.strikemapExpiry) return;
     fillExpirySelect($("expirySelect"), sm.expiries, state.strikemapExpiry);
     const cur = sm.by_expiry[state.strikemapExpiry];
-    const lv = levelsFromStatus(state.strikemapExpiry === "ALL" ? {} : cur);
+    const lv = levelsFromStatus(cur);
     levelChips($("strikemapLevels"), lv);
     Charts.renderTornado($("chart-strikemap"), cur.rows, lv,
       { fmt: "money", showNet: true });
@@ -245,7 +246,8 @@
   function renderFlowView() {
     const f = state.data.views.flow;
     if (!f) return;
-    if (!f.by_expiry[state.flowExpiry]) state.flowExpiry = "ALL";
+    if (!f.expiries.includes(state.flowExpiry)) state.flowExpiry = f.expiries[0];
+    if (!state.flowExpiry) return;
     fillExpirySelect($("flowExpirySelect"), f.expiries, state.flowExpiry);
     document.querySelectorAll("#flowModeBtns button").forEach((b) =>
       b.classList.toggle("active", b.dataset.mode === state.flowMode));
@@ -260,15 +262,27 @@
       : state.flowMode === "prem" ? "money"
         : "count";
     Charts.renderTornado($("chart-flow"), rows,
-      { spot: state.data.status.spot },
+      {
+        spot: state.data.status.spot,
+        expected_move_lower: cur.expected_move ? cur.expected_move.lower : null,
+        expected_move_upper: cur.expected_move ? cur.expected_move.upper : null,
+        sd_lower: cur.expected_move ? cur.expected_move.sd_lower : null,
+        sd_upper: cur.expected_move ? cur.expected_move.sd_upper : null,
+      },
       { fmt, showNet: false });
 
     const t = f.totals;
     $("flowTotals").innerHTML =
-      chipHtml("Call Vol", Fmt.fmtCount(cur.call_vol), "", "pos") +
-      chipHtml("Put Vol", Fmt.fmtCount(cur.put_vol), "", "neg") +
-      chipHtml("Call Prem", Fmt.fmtM(cur.call_prem_m), "", "pos") +
-      chipHtml("Put Prem", Fmt.fmtM(cur.put_prem_m), "", "neg") +
+      chipHtml("STRADDLE", Fmt.fmtPrice(
+        cur.expected_move ? cur.expected_move.straddle : null)) +
+      chipHtml("ATM IV", cur.expected_move && cur.expected_move.atm_iv_pct !== null
+        ? cur.expected_move.atm_iv_pct.toFixed(2) + "%" : "—") +
+      chipHtml("1 SD MOVE", Fmt.fmtPrice(
+        cur.expected_move ? cur.expected_move.standard_deviation : null)) +
+      chipHtml("Call Vol", Fmt.fmtCount(cur.call_vol)) +
+      chipHtml("Put Vol", Fmt.fmtCount(cur.put_vol)) +
+      chipHtml("Call Prem", Fmt.fmtM(cur.call_prem_m)) +
+      chipHtml("Put Prem", Fmt.fmtM(cur.put_prem_m)) +
       chipHtml("Buy-side Prem", Fmt.fmtM(t.prem_buy_m)) +
       chipHtml("Sell-side Prem", Fmt.fmtM(t.prem_sell_m));
 
@@ -341,6 +355,14 @@
       card("P/C OI", mm.pcr_oi === null ? "—" : mm.pcr_oi);
   }
 
+  function renderVolatilityView() {
+    const vol = state.data.views.volatility;
+    if (!vol) return;
+    Charts.renderIvTermStructure($("chart-iv-term"), vol.term_structure || []);
+    Charts.renderExpectedMoveTermStructure(
+      $("chart-expected-move-term"), vol.expected_move_term_structure || []);
+  }
+
   function renderAll() {
     if (!state.data) return;
     renderStatus();
@@ -349,6 +371,7 @@
     else if (state.view === "zerodte") renderZeroDteView();
     else if (state.view === "flow") renderFlowView();
     else if (state.view === "sentiment") renderSentimentView();
+    else if (state.view === "volatility") renderVolatilityView();
   }
 
   /* ------------------------------ wiring ------------------------------ */

@@ -109,6 +109,8 @@ main { padding: 14px; max-width: 1180px; margin: 0 auto; }
 }
 .chips-inline { display: flex; gap: 8px; flex-wrap: wrap; }
 .chips-inline .schip { min-width: 70px; }
+#flowTotals .schip .k { color: #ffffff; }
+#flowTotals .schip .v { color: #ffffff; font-weight: 700; }
 
 .chart-box {
   width: 100%; height: 460px;

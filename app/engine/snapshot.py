@@ -50,9 +50,14 @@ class VixCache:
 
 async def build_snapshot(client: httpx.AsyncClient, vix_cache: VixCache) -> dict:
     cfg = config.SPX
-    async with FETCH_SEMAPHORE:
-        chain = await cboe.fetch_chain(client)
-    vix = await vix_cache.get(client)
+
+    async def fetch_chain_once():
+        async with FETCH_SEMAPHORE:
+            return await cboe.fetch_chain(client)
+
+    # Both requests are independent. Starting them together removes the VIX
+    # round trip from the cold snapshot's critical path.
+    chain, vix = await asyncio.gather(fetch_chain_once(), vix_cache.get(client))
 
     spot = chain.spot
     today = market.today_expiry_date()
@@ -71,7 +76,7 @@ async def build_snapshot(client: httpx.AsyncClient, vix_cache: VixCache) -> dict
         contracts, spot, as_of=chain.last_trade_time)
     zerodte = gex_engine.build_zero_dte(
         contracts, spot, cfg, today, as_of=chain.last_trade_time)
-    flow = flow_engine.build_flow(contracts, spot, cfg)
+    flow = flow_engine.build_flow(contracts, spot, cfg, today=today)
     zshare = zerodte["stats"]["dte_share_pct"] if zerodte.get("available") else 0.0
     senti = sentiment_engine.compute_sentiment(
         chain, gex_totals, flip_r, vix, today, zshare)
@@ -106,6 +111,10 @@ async def build_snapshot(client: httpx.AsyncClient, vix_cache: VixCache) -> dict
         "strikemap": strikemap,
         "levels": levels,
         "flow": flow,
+        "volatility": {
+            "term_structure": flow["term_structure"],
+            "expected_move_term_structure": flow["expected_move_term_structure"],
+        },
         "sentiment": senti,
         "zerodte": zerodte,
         "meta": {

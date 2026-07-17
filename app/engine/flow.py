@@ -8,6 +8,7 @@ at/below bid = sell, otherwise neutral.
 from __future__ import annotations
 
 import datetime
+import math
 from collections import defaultdict
 from typing import Dict, List, Optional
 
@@ -30,9 +31,57 @@ def premium(c: Contract) -> float:
     return c.volume * c.last * config.CONTRACT_MULTIPLIER
 
 
-def build_flow(contracts: List[Contract], spot: float, cfg: dict) -> dict:
+def _round_to_25(value: float) -> float:
+    """Round a positive index level to the nearest 25-point increment."""
+    return math.floor(value / 25.0 + 0.5) * 25.0
+
+
+def _expected_move(contracts: List[Contract], spot: float,
+                   expiry: Optional[datetime.date],
+                   today: datetime.date) -> Optional[dict]:
+    """Return ATM-straddle expected-move bounds for one expiration."""
+    if expiry is None:
+        return None
+
+    def usable(c: Contract) -> bool:
+        return c.expiry == expiry and c.bid >= 0.0 and c.ask > 0.0 and c.ask >= c.bid
+
+    calls = [c for c in contracts if c.cp == "C" and usable(c)]
+    puts = [c for c in contracts if c.cp == "P" and usable(c)]
+    if not calls or not puts:
+        return None
+
+    call = min(calls, key=lambda c: (abs(c.strike - spot), c.strike))
+    put = min(puts, key=lambda c: (abs(c.strike - spot), c.strike))
+    call_mid = (call.bid + call.ask) / 2.0
+    put_mid = (put.bid + put.ask) / 2.0
+    move = call_mid + put_mid
+    atm_iv = ((call.iv + put.iv) / 2.0
+              if call.iv > 0.0 and put.iv > 0.0 else None)
+    dte = max((expiry - today).days, 0)
+    standard_deviation = (spot * atm_iv * math.sqrt(dte / 365.0)
+                          if atm_iv is not None else None)
+    return {
+        "lower": _round_to_25(spot - move),
+        "upper": _round_to_25(spot + move),
+        "straddle": round(move, 2),
+        "call_strike": call.strike,
+        "put_strike": put.strike,
+        "atm_iv_pct": round(atm_iv * 100.0, 2) if atm_iv is not None else None,
+        "standard_deviation": round(standard_deviation, 2)
+                              if standard_deviation is not None else None,
+        "sd_lower": _round_to_25(spot - standard_deviation)
+                    if standard_deviation is not None else None,
+        "sd_upper": _round_to_25(spot + standard_deviation)
+                    if standard_deviation is not None else None,
+    }
+
+
+def build_flow(contracts: List[Contract], spot: float, cfg: dict,
+               today: Optional[datetime.date] = None) -> dict:
+    today = today or datetime.date.today()
     expiries = sorted({c.expiry for c in contracts})[:config.MAX_FLOW_EXPIRATIONS]
-    keys = ["ALL"] + [e.isoformat() for e in expiries]
+    keys = [e.isoformat() for e in expiries]
     step = choose_step(spot, cfg["window_pct"], cfg["steps"], config.MAX_HEATMAP_ROWS)
     lo, hi = _window(spot, cfg["window_pct"])
 
@@ -85,6 +134,7 @@ def build_flow(contracts: List[Contract], spot: float, cfg: dict) -> dict:
             ])
         return {
             "rows": rows,
+            "expected_move": _expected_move(contracts, spot, expiry, today),
             "call_vol": tot["call_vol"], "put_vol": tot["put_vol"],
             "call_prem_m": round(tot["call_prem"] / M, 1),
             "put_prem_m": round(tot["put_prem"] / M, 1),
@@ -93,6 +143,24 @@ def build_flow(contracts: List[Contract], spot: float, cfg: dict) -> dict:
     by_expiry = {"ALL": rows_for(None)}
     for e in expiries:
         by_expiry[e.isoformat()] = rows_for(e)
+
+    term_structure = []
+    expected_move_term_structure = []
+    for e in expiries:
+        expected = by_expiry[e.isoformat()]["expected_move"]
+        if expected:
+            expected_move_term_structure.append({
+                "expiry": e.isoformat(),
+                "dte": max((e - today).days, 0),
+                "lower": expected["lower"],
+                "upper": expected["upper"],
+            })
+        if expected and expected["atm_iv_pct"] is not None:
+            term_structure.append({
+                "expiry": e.isoformat(),
+                "dte": max((e - today).days, 0),
+                "atm_iv_pct": expected["atm_iv_pct"],
+            })
 
     # Top single contracts by premium with buy/sell classification.
     traded = [c for c in contracts if c.volume > 0 and c.last > 0]
@@ -116,6 +184,8 @@ def build_flow(contracts: List[Contract], spot: float, cfg: dict) -> dict:
         "expiries": keys,
         "step": step,
         "by_expiry": by_expiry,
+        "term_structure": term_structure,
+        "expected_move_term_structure": expected_move_term_structure,
         "top_trades": top_trades,
         "totals": {
             "call_vol": by_expiry["ALL"]["call_vol"],

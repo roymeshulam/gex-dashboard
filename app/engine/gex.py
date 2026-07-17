@@ -276,8 +276,8 @@ def build_strikemap(contracts: List[Contract], spot: float, cfg: dict,
 
     as_of = as_of or datetime.datetime.now(tz=datetime.timezone.utc)
     by_expiry: Dict[str, dict] = {}
-    keys = ["ALL"] + [e.isoformat() for e in expiries]
-    for key in keys:
+    keys = [e.isoformat() for e in expiries]
+    for key in ["ALL"] + keys:
         exp = None if key == "ALL" else datetime.date.fromisoformat(key)
         profile = strike_profile(contracts, spot, expiry=exp)
         call_wall, put_wall = find_walls(profile)

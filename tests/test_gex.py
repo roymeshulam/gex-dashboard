@@ -85,10 +85,10 @@ def test_expiry_dropdowns_include_thirty_expirations():
     option_flow = flow.build_flow(contracts, 7400.0, cfg)
 
     assert len(heatmap["expiries"]) == 14
-    assert len(strikemap["expiries"]) == 31  # "ALL" plus 30 dates
-    assert len(option_flow["expiries"]) == 31
-    assert strikemap["expiries"][-1] == (start + datetime.timedelta(days=29)).isoformat()
-    assert option_flow["expiries"][-1] == (start + datetime.timedelta(days=29)).isoformat()
+    assert len(strikemap["expiries"]) == 31  # dated cycles only; no "ALL"
+    assert len(option_flow["expiries"]) == 31  # dated cycles only; no "ALL"
+    assert strikemap["expiries"][-1] == (start + datetime.timedelta(days=30)).isoformat()
+    assert option_flow["expiries"][-1] == (start + datetime.timedelta(days=30)).isoformat()
 
 
 def test_flow_includes_open_interest_and_available_bid_ask_spreads():
@@ -104,6 +104,53 @@ def test_flow_includes_open_interest_and_available_bid_ask_spreads():
     assert row[5:7] == [300, 700]
     assert row[7] == 0.3
     assert row[8] == 0.1
+
+
+def test_flow_expected_move_uses_nearest_call_and_put_mids_per_expiry():
+    other_expiry = EXP_A + datetime.timedelta(days=7)
+    cs = [
+        mk("C", 7390, bid=19.0, ask=21.0, expiry=EXP_A),
+        mk("P", 7410, bid=29.0, ask=31.0, expiry=EXP_A),
+        mk("C", 7500, bid=99.0, ask=101.0, expiry=EXP_A),
+        mk("P", 7400, bid=1.0, ask=2.0, expiry=other_expiry),
+    ]
+
+    result = flow.build_flow(
+        cs, 7400.0, config.SPX, today=EXP_A - datetime.timedelta(days=28)
+    )["by_expiry"]
+
+    assert result["ALL"]["expected_move"] is None
+    assert result[EXP_A.isoformat()]["expected_move"] == {
+        "lower": 7350.0,
+        "upper": 7450.0,
+        "straddle": 50.0,
+        "call_strike": 7390,
+        "put_strike": 7410,
+        "atm_iv_pct": 20.0,
+        "standard_deviation": 409.92,
+        "sd_lower": 7000.0,
+        "sd_upper": 7800.0,
+    }
+    assert result[other_expiry.isoformat()]["expected_move"] is None
+
+
+def test_flow_builds_atm_iv_term_structure_by_dte():
+    cs = [
+        mk("C", 7400, bid=10.0, ask=12.0, iv=0.18, expiry=EXP_A),
+        mk("P", 7400, bid=11.0, ask=13.0, iv=0.22, expiry=EXP_A),
+    ]
+
+    result = flow.build_flow(
+        cs, 7400.0, config.SPX, today=EXP_A - datetime.timedelta(days=28)
+    )
+
+    assert result["term_structure"] == [{
+        "expiry": EXP_A.isoformat(), "dte": 28, "atm_iv_pct": 20.0,
+    }]
+    assert result["expected_move_term_structure"] == [{
+        "expiry": EXP_A.isoformat(), "dte": 28,
+        "lower": 7375.0, "upper": 7425.0,
+    }]
 
 
 def test_zero_dte_empty_state():

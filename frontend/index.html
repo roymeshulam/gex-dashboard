@@ -27,10 +27,11 @@
   <div id="statusRow" class="status-row"></div>
 
   <nav class="tabs" id="viewTabs">
+    <button data-view="flow"><i>⇄</i><span>Option Flow</span></button>
+    <button data-view="volatility"><i>⌁</i><span>Volatility</span></button>
     <button data-view="heatmap"><i>▦</i><span>GEX Heatmap</span></button>
     <button data-view="strikemap"><i>▤</i><span>Strike Map</span></button>
     <button data-view="zerodte"><i>◷</i><span>0DTE</span></button>
-    <button data-view="flow"><i>⇄</i><span>Option Flow</span></button>
     <button data-view="sentiment"><i>◑</i><span>Sentiment</span></button>
   </nav>
 
@@ -88,10 +89,6 @@
         </span>
       </div>
       <div class="panel-controls"><span id="flowTotals" class="chips-inline"></span></div>
-      <div class="panel-note">Side classification is a heuristic on the last
-        trade vs the current delayed quote (at/above ask = buy, at/below bid =
-        sell) — treat as an estimate, not tape-true aggressor data. Bid–ask
-        spreads are averages of available delayed quotes at each strike.</div>
       <div class="chart-box" id="chart-flow"></div>
       <div class="card"><h3>Largest contracts by traded premium</h3>
         <div class="table-scroll"><table id="topTrades"></table></div>
@@ -119,13 +116,18 @@
       <div class="metric-grid" id="sentiMetrics"></div>
     </section>
 
+    <section id="panel-volatility" class="panel hidden">
+      <div class="panel-note">SPX ATM implied-volatility term structure. Each point
+        averages the IV of the nearest-to-spot call and put for that expiration.</div>
+      <div class="card"><h3>ATM IV by days to expiration</h3>
+        <div class="chart-box" id="chart-iv-term"></div>
+      </div>
+      <div class="card"><h3>Expected move by days to expiration</h3>
+        <div class="chart-box" id="chart-expected-move-term"></div>
+      </div>
+    </section>
+
   </main>
 
-  <footer>
-    <p>Data: CBOE delayed quotes (~15&nbsp;min delay; open interest updates each
-    morning). GEX, walls, flip and sentiment are recalculated every 30&nbsp;s.
-    Educational market-structure tool — not financial advice.
-    <a href="/guide.html">How to read this dashboard →</a></p>
-  </footer>
 </body>
 </html>

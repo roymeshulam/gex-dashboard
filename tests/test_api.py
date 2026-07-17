@@ -21,7 +21,7 @@ def _client(monkeypatch) -> TestClient:
     monkeypatch.setattr(routes, "_get_bundle", fake_get_bundle)
     monkeypatch.setattr(routes.market, "today_expiry_date",
                         lambda: datetime.date(2026, 7, 12))
-    return TestClient(create_app(include_mcp=False))
+    return TestClient(create_app(include_mcp=False, prewarm=False))
 
 
 def test_levels_accepts_single_integer(monkeypatch):

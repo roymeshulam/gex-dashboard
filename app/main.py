@@ -23,7 +23,7 @@ FRONTEND_DIR = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__fi
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    await runtime.start()
+    await runtime.start(prewarm=app.state.prewarm)
     try:
         if app.state.mcp_enabled:
             async with mcp.session_manager.run():
@@ -34,9 +34,10 @@ async def lifespan(app: FastAPI):
         await runtime.close()
 
 
-def create_app(include_mcp: bool = True) -> FastAPI:
+def create_app(include_mcp: bool = True, prewarm: bool = True) -> FastAPI:
     app = FastAPI(title="GEX Dashboard", lifespan=lifespan)
     app.state.mcp_enabled = include_mcp
+    app.state.prewarm = prewarm
     app.add_middleware(GZipMiddleware, minimum_size=1024)
 
     @app.middleware("http")
