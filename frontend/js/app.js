@@ -4,13 +4,14 @@
   "use strict";
 
   const REFRESH_SEC = 30;
-  const VIEWS = ["heatmap", "strikemap", "zerodte", "flow", "sentiment", "volatility"];
+  const VIEWS = ["heatmap", "strikemap", "zerodte", "flow", "greeks", "sentiment", "volatility"];
 
   const state = {
     view: "heatmap",
     countdown: REFRESH_SEC, loading: false, abort: null,
     retries: 0, lastFetch: 0, data: null,
     strikemapExpiry: null, flowExpiry: null, flowMode: "vol",
+    greeksExpiry: null, greeksStrike: null, greeksCp: "C", greeksRequest: 0,
     wakeTimer: null,
   };
 
@@ -363,6 +364,80 @@
       $("chart-expected-move-term"), vol.expected_move_term_structure || []);
   }
 
+  function greeksRows() {
+    const surface = state.data.views.greeks;
+    return surface && state.greeksExpiry
+      ? surface.by_expiry[state.greeksExpiry].rows : [];
+  }
+
+  function setGreeksStrikeOptions() {
+    const select = $("greeksStrikeSelect");
+    const ivIndex = state.greeksCp === "C" ? 1 : 2;
+    const strikes = greeksRows().filter((row) => row[ivIndex] !== null).map((row) => row[0]);
+    if (!strikes.length) { select.innerHTML = ""; return false; }
+    if (!strikes.includes(Number(state.greeksStrike))) {
+      const spot = state.data.status.spot;
+      state.greeksStrike = strikes.reduce((best, value) =>
+        Math.abs(value - spot) < Math.abs(best - spot) ? value : best, strikes[0]);
+    }
+    select.innerHTML = strikes.map((strike) =>
+      '<option value="' + strike + '"' + (strike === Number(state.greeksStrike) ? " selected" : "") +
+      ">" + Fmt.fmtStrike(strike) + "</option>").join("");
+    return true;
+  }
+
+  async function renderGreeksView() {
+    const surface = state.data.views.greeks;
+    if (!surface || !surface.expiries.length) return;
+    if (!surface.expiries.includes(state.greeksExpiry)) state.greeksExpiry = surface.expiries[0];
+    fillExpirySelect($("greeksExpirySelect"), surface.expiries, state.greeksExpiry);
+    document.querySelectorAll("#greeksTypeBtns button").forEach((button) =>
+      button.classList.toggle("active", button.dataset.cp === state.greeksCp));
+    if (!setGreeksStrikeOptions()) return;
+
+    const request = ++state.greeksRequest;
+    try {
+      const data = await Api.fetchGreeks(
+        state.greeksExpiry, state.greeksStrike, state.greeksCp, { timeout: 30000 });
+      if (request !== state.greeksRequest || state.view !== "greeks") return;
+      state.greeksStrike = data.strike;
+      $("greeksBasis").innerHTML =
+        chipHtml("SPOT", Fmt.fmtStrike(data.spot)) +
+        chipHtml("DTE", data.dte) +
+        chipHtml("IMPLIED VOL", data.iv_pct.toFixed(2) + "%") +
+        chipHtml("RATE", data.rate_pct.toFixed(2) + "%");
+      const metricOptions = {
+        price: { label: "Option price", formatter: Fmt.fmtPrice, nonnegative: true },
+        delta: { label: "Delta", formatter: (value) => Number(value).toFixed(3) },
+        gamma: { label: "Gamma", formatter: (value) => Number(value).toFixed(5), nonnegative: true },
+        theta: { label: "Theta / day", formatter: (value) => Number(value).toFixed(2) },
+        vega: { label: "Vega / 1% IV", formatter: (value) => Number(value).toFixed(2), nonnegative: true },
+      };
+      const axes = {
+        spot: { suffix: "spot", label: "Spot", actual: data.spot, formatter: Fmt.fmtStrike },
+        volatility: { suffix: "vol", label: "Implied volatility", actual: data.iv_pct,
+          formatter: (value) => Number(value).toFixed(1) + "%" },
+        time: { suffix: "time", label: "Days to expiry", actual: data.dte,
+          formatter: (value) => value + "d" },
+      };
+      Object.keys(metricOptions).forEach((metric) => {
+        const metricConfig = metricOptions[metric];
+        Object.keys(axes).forEach((axis) => {
+          const axisConfig = axes[axis];
+          const id = metric === "price" ? "chart-greeks-" + axisConfig.suffix
+            : "chart-" + metric + "-" + axisConfig.suffix;
+          Charts.renderPriceCurve($(id), data.curves[metric][axis], {
+            xLabel: axisConfig.label, actualX: axisConfig.actual,
+            xFormatter: axisConfig.formatter, yLabel: metricConfig.label,
+            yFormatter: metricConfig.formatter, nonnegative: metricConfig.nonnegative,
+          });
+        });
+      });
+    } catch (error) {
+      if (request === state.greeksRequest) banner("Unable to calculate option curves: " + error.message, "error");
+    }
+  }
+
   function renderAll() {
     if (!state.data) return;
     renderStatus();
@@ -372,6 +447,7 @@
     else if (state.view === "flow") renderFlowView();
     else if (state.view === "sentiment") renderSentimentView();
     else if (state.view === "volatility") renderVolatilityView();
+    else if (state.view === "greeks") renderGreeksView();
   }
 
   /* ------------------------------ wiring ------------------------------ */
@@ -389,6 +465,16 @@
   $("flowExpirySelect").addEventListener("change", (e) => {
     state.flowExpiry = e.target.value; renderFlowView();
   });
+  $("greeksExpirySelect").addEventListener("change", (e) => {
+    state.greeksExpiry = e.target.value; state.greeksStrike = null; renderGreeksView();
+  });
+  $("greeksStrikeSelect").addEventListener("change", (e) => {
+    state.greeksStrike = Number(e.target.value); renderGreeksView();
+  });
+  document.querySelectorAll("#greeksTypeBtns button").forEach((button) =>
+    button.addEventListener("click", () => {
+      state.greeksCp = button.dataset.cp; state.greeksStrike = null; renderGreeksView();
+    }));
   document.querySelectorAll("#flowModeBtns button").forEach((b) =>
     b.addEventListener("click", () => {
       state.flowMode = b.dataset.mode; renderFlowView();

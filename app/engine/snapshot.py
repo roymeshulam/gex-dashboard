@@ -19,6 +19,7 @@ from ..models import VixData
 from ..providers import cboe
 from . import flow as flow_engine
 from . import gex as gex_engine
+from . import greeks as greeks_engine
 from . import sentiment as sentiment_engine
 
 log = logging.getLogger(__name__)
@@ -77,6 +78,7 @@ async def build_snapshot(client: httpx.AsyncClient, vix_cache: VixCache) -> dict
     zerodte = gex_engine.build_zero_dte(
         contracts, spot, cfg, today, as_of=chain.last_trade_time)
     flow = flow_engine.build_flow(contracts, spot, cfg, today=today)
+    greeks = greeks_engine.build_surface(contracts, spot, today)
     zshare = zerodte["stats"]["dte_share_pct"] if zerodte.get("available") else 0.0
     senti = sentiment_engine.compute_sentiment(
         chain, gex_totals, flip_r, vix, today, zshare)
@@ -115,6 +117,11 @@ async def build_snapshot(client: httpx.AsyncClient, vix_cache: VixCache) -> dict
             "term_structure": flow["term_structure"],
             "expected_move_term_structure": flow["expected_move_term_structure"],
         },
+        "greeks": {
+            "expiries": greeks["expiries"],
+            "by_expiry": greeks["by_expiry"],
+        },
+        "_greeks_surface": greeks,
         "sentiment": senti,
         "zerodte": zerodte,
         "meta": {

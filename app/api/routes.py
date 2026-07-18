@@ -11,12 +11,13 @@ from fastapi import APIRouter, HTTPException, Query, Request
 from .. import market
 from ..providers.cboe import CboeError
 from ..runtime import runtime
+from ..engine.greeks import calculate_curves
 
 log = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/api")
 
-VIEWS = {"summary", "heatmap", "strikemap", "flow", "sentiment", "volatility", "zerodte"}
+VIEWS = {"summary", "heatmap", "strikemap", "flow", "greeks", "sentiment", "volatility", "zerodte"}
 NONNEGATIVE_INTEGER = re.compile(r"^\d+$")
 
 
@@ -116,3 +117,16 @@ async def expiry_levels(request: Request, dte: list[str] = Query(...)):
     result = [_level_response(bundle, days, expiry)
               for days, expiry in requested]
     return result[0] if len(result) == 1 else result
+
+
+@router.get("/spx/greeks")
+async def greeks_curves(request: Request, expiry: str, strike: float,
+                        cp: str = Query(default="C", pattern="^[CPcp]$")):
+    try:
+        bundle, _cache_meta = await _get_bundle(request)
+        return calculate_curves(bundle["_greeks_surface"], expiry, strike, cp)
+    except CboeError as e:
+        log.error("SPX Greeks calculation failed: %s", e)
+        raise HTTPException(status_code=503, detail="upstream data unavailable")
+    except ValueError as e:
+        raise HTTPException(status_code=422, detail=str(e))

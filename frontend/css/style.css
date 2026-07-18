@@ -145,6 +145,10 @@ main { padding: 14px; max-width: 1180px; margin: 0 auto; }
 }
 .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
 .grid-2 .card { margin-top: 12px; }
+.grid-3 { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; }
+.grid-3 .card { min-width: 0; }
+.greeks-row { margin-top: 12px; }
+.greeks-chart { height: 360px; }
 
 table { width: 100%; border-collapse: collapse; font-size: 13px; }
 th { color: var(--muted); font-size: 11px; text-transform: uppercase;
@@ -206,11 +210,11 @@ body.first-load .chart-box {
   .tabs button i { font-size: 17px; }
   .tabs button.active { color: var(--accent); }
 
-  .grid-2, .grid-senti, .metric-grid { grid-template-columns: 1fr 1fr; }
+  .grid-2, .grid-3, .grid-senti, .metric-grid { grid-template-columns: 1fr 1fr; }
   .grid-senti { grid-template-columns: 1fr; }
   .chart-box { height: 420px; }
 }
 
 @media (max-width: 480px) {
-  .metric-grid, .grid-2 { grid-template-columns: 1fr 1fr; }
+  .metric-grid, .grid-2, .grid-3 { grid-template-columns: 1fr; }
 }

@@ -8,12 +8,12 @@
   <link rel="icon" href="/favicon.ico" sizes="any">
   <link rel="icon" type="image/png" href="/favicon-32.png" sizes="32x32">
   <link rel="apple-touch-icon" href="/apple-touch-icon.png">
-  <link rel="stylesheet" href="/css/style.css?v=9">
+  <link rel="stylesheet" href="/css/style.css?v=11">
   <script defer src="/js/vendor/echarts.min.js?v=5.5.1"></script>
   <script defer src="/js/format.js?v=5"></script>
-  <script defer src="/js/api.js?v=5"></script>
-  <script defer src="/js/charts.js?v=7"></script>
-  <script defer src="/js/app.js?v=8"></script>
+  <script defer src="/js/api.js?v=6"></script>
+  <script defer src="/js/charts.js?v=10"></script>
+  <script defer src="/js/app.js?v=10"></script>
 </head>
 <body>
   <header class="topbar">
@@ -27,8 +27,9 @@
   <div id="statusRow" class="status-row"></div>
 
   <nav class="tabs" id="viewTabs">
-    <button data-view="flow"><i>⇄</i><span>Option Flow</span></button>
     <button data-view="volatility"><i>⌁</i><span>Volatility</span></button>
+    <button data-view="greeks"><i>Δ</i><span>Greeks</span></button>
+    <button data-view="flow"><i>⇄</i><span>Option Flow</span></button>
     <button data-view="heatmap"><i>▦</i><span>GEX Heatmap</span></button>
     <button data-view="strikemap"><i>▤</i><span>Strike Map</span></button>
     <button data-view="zerodte"><i>◷</i><span>0DTE</span></button>
@@ -83,8 +84,8 @@
         </label>
         <span id="flowModeBtns" class="seg">
           <button data-mode="vol" class="active">Volume</button>
-          <button data-mode="prem">Premium</button>
           <button data-mode="oi">Open interest</button>
+          <button data-mode="prem">Premium</button>
           <button data-mode="spread">Bid–ask spread</button>
         </span>
       </div>
@@ -124,6 +125,67 @@
       </div>
       <div class="card"><h3>Expected move by days to expiration</h3>
         <div class="chart-box" id="chart-expected-move-term"></div>
+      </div>
+    </section>
+
+    <section id="panel-greeks" class="panel hidden">
+      <div class="panel-note">Black–Scholes option-price sensitivities using the
+        selected contract's implied volatility. The time curve uses the nearest
+        matching strike's IV from each expiry cycle.</div>
+      <div class="panel-controls greeks-controls">
+        <label>Expiration <select id="greeksExpirySelect"></select></label>
+        <label>Strike <select id="greeksStrikeSelect"></select></label>
+        <span id="greeksTypeBtns" class="seg" aria-label="Option type">
+          <button data-cp="C" class="active">Call</button>
+          <button data-cp="P">Put</button>
+        </span>
+        <span id="greeksBasis" class="chips-inline"></span>
+      </div>
+      <div class="grid-3">
+        <div class="card">
+          <h3>Option price by spot</h3>
+          <div class="chart-box greeks-chart" id="chart-greeks-spot"></div>
+        </div>
+        <div class="card">
+          <h3>Option price by volatility</h3>
+          <div class="chart-box greeks-chart" id="chart-greeks-vol"></div>
+        </div>
+        <div class="card">
+          <h3>Option price by time to expiry</h3>
+          <div class="chart-box greeks-chart" id="chart-greeks-time"></div>
+        </div>
+      </div>
+      <div class="grid-3 greeks-row">
+        <div class="card"><h3>Delta by spot</h3>
+          <div class="chart-box greeks-chart" id="chart-delta-spot"></div></div>
+        <div class="card"><h3>Delta by volatility</h3>
+          <div class="chart-box greeks-chart" id="chart-delta-vol"></div></div>
+        <div class="card"><h3>Delta by time to expiry</h3>
+          <div class="chart-box greeks-chart" id="chart-delta-time"></div></div>
+      </div>
+      <div class="grid-3 greeks-row">
+        <div class="card"><h3>Gamma by spot</h3>
+          <div class="chart-box greeks-chart" id="chart-gamma-spot"></div></div>
+        <div class="card"><h3>Gamma by volatility</h3>
+          <div class="chart-box greeks-chart" id="chart-gamma-vol"></div></div>
+        <div class="card"><h3>Gamma by time to expiry</h3>
+          <div class="chart-box greeks-chart" id="chart-gamma-time"></div></div>
+      </div>
+      <div class="grid-3 greeks-row">
+        <div class="card"><h3>Theta by spot</h3>
+          <div class="chart-box greeks-chart" id="chart-theta-spot"></div></div>
+        <div class="card"><h3>Theta by volatility</h3>
+          <div class="chart-box greeks-chart" id="chart-theta-vol"></div></div>
+        <div class="card"><h3>Theta by time to expiry</h3>
+          <div class="chart-box greeks-chart" id="chart-theta-time"></div></div>
+      </div>
+      <div class="grid-3 greeks-row">
+        <div class="card"><h3>Vega by spot</h3>
+          <div class="chart-box greeks-chart" id="chart-vega-spot"></div></div>
+        <div class="card"><h3>Vega by volatility</h3>
+          <div class="chart-box greeks-chart" id="chart-vega-vol"></div></div>
+        <div class="card"><h3>Vega by time to expiry</h3>
+          <div class="chart-box greeks-chart" id="chart-vega-time"></div></div>
       </div>
     </section>
 

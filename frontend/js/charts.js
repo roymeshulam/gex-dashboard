@@ -388,8 +388,59 @@
     inst.resize();
   }
 
+  function renderPriceCurve(el, rows, opts) {
+    opts = opts || {};
+    const yLabel = opts.yLabel || "Option price";
+    const yFormatter = opts.yFormatter || Fmt.fmtPrice;
+    const inst = chart(el, 360);
+    const actual = opts.actualX;
+    inst.setOption({
+      animation: false,
+      grid: { left: 58, right: 18, top: 44, bottom: 48 },
+      tooltip: {
+        trigger: "axis", backgroundColor: "#11151f", borderColor: "#1d2433",
+        textStyle: baseText(),
+        formatter: (ps) => {
+          const point = ps[0].value;
+          let label = opts.xFormatter ? opts.xFormatter(point[0]) : point[0];
+          let extra = "";
+          if (point.length > 2) extra = "<br>Cycle IV: <b>" + point[2].toFixed(2) + "%</b>";
+          return opts.xLabel + ": <b>" + label + "</b><br>" + yLabel + ": <b>" +
+            yFormatter(point[1]) + "</b>" + extra;
+        },
+      },
+      xAxis: {
+        type: "value", name: opts.xLabel, nameLocation: "middle", nameGap: 32,
+        axisLabel: {
+          color: MUTED, fontSize: 9,
+          formatter: opts.xFormatter || ((v) => v),
+        },
+        splitLine: { lineStyle: { color: "#161b29" } }, scale: true,
+      },
+      yAxis: {
+        type: "value", name: yLabel, nameTextStyle: { color: MUTED },
+        min: opts.nonnegative ? 0 : undefined,
+        axisLabel: { color: MUTED, fontSize: 9, formatter: yFormatter },
+        splitLine: { lineStyle: { color: "#161b29" } },
+      },
+      series: [{
+        type: "line", showSymbol: rows.length < 35, symbolSize: 5,
+        data: rows, lineStyle: { color: BLUE, width: 2 }, itemStyle: { color: BLUE },
+        areaStyle: { color: "rgba(77,163,255,0.08)" },
+        markLine: actual === null || actual === undefined ? undefined : {
+          symbol: "none", silent: true,
+          lineStyle: { color: AMBER, type: "dashed" },
+          label: { formatter: "CURRENT", color: AMBER, fontSize: 9 },
+          data: [{ xAxis: actual }],
+        },
+      }],
+    }, { notMerge: true });
+    inst.resize();
+  }
+
   window.Charts = {
     renderHeatmap, renderTornado, renderGauge, renderMiniBar, renderIvTermStructure,
     renderExpectedMoveTermStructure,
+    renderPriceCurve,
   };
 })();
