@@ -19,6 +19,11 @@ def _normal_pdf(value: float) -> float:
     return math.exp(-0.5 * value * value) / math.sqrt(2.0 * math.pi)
 
 
+def _round_to_25(value: float) -> float:
+    """Round an index level to the nearest 25-point increment."""
+    return math.floor(value / 25.0 + 0.5) * 25.0
+
+
 def option_price(spot: float, strike: float, years: float, iv: float,
                  cp: str, rate: float = RISK_FREE_RATE,
                  dividend_yield: float = DIVIDEND_YIELD) -> float:
@@ -123,11 +128,14 @@ def calculate_curves(surface: dict, expiry: str, strike: float, cp: str) -> dict
     spot = surface["spot"]
     dte = surface["by_expiry"][expiry]["dte"]
     years = max(dte, 0.25) / 365.0
+    expected_move = spot * iv * math.sqrt(years)
+    spot_lower = _round_to_25(spot - expected_move)
+    spot_upper = _round_to_25(spot + expected_move)
 
     metrics = ("price", "delta", "gamma", "theta", "vega")
     curves = {metric: {"spot": [], "volatility": [], "time": []} for metric in metrics}
     for index in range(61):
-        x = spot * (0.7 + index * 0.01)
+        x = spot_lower + (spot_upper - spot_lower) * index / 60.0
         values = option_metrics(x, strike, years, iv, cp)
         for metric in metrics:
             curves[metric]["spot"].append([round(x, 2), round(values[metric], 6)])
@@ -151,6 +159,8 @@ def calculate_curves(surface: dict, expiry: str, strike: float, cp: str) -> dict
     return {
         "expiry": expiry, "strike": strike, "cp": cp, "spot": round(spot, 2),
         "dte": dte, "iv_pct": round(iv * 100.0, 2),
+        "expected_move": round(expected_move, 2),
+        "spot_lower": spot_lower, "spot_upper": spot_upper,
         "rate_pct": round(RISK_FREE_RATE * 100.0, 2),
         "curves": curves,
         # Retain the original price fields for API compatibility.

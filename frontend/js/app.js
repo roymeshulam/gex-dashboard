@@ -417,7 +417,8 @@
         vega: { label: "Vega / 1% IV", formatter: (value) => Number(value).toFixed(2), nonnegative: true },
       };
       const axes = {
-        spot: { suffix: "spot", label: "Spot", actual: data.spot, formatter: Fmt.fmtStrike },
+        spot: { suffix: "spot", label: "Spot", actual: data.spot, formatter: Fmt.fmtStrike,
+          min: data.spot_lower, max: data.spot_upper },
         volatility: { suffix: "vol", label: "Implied volatility", actual: data.iv_pct,
           formatter: (value) => Number(value).toFixed(1) + "%" },
         time: { suffix: "time", label: "Days to expiry", actual: null,
