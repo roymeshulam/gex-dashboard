@@ -396,10 +396,13 @@
     if (!setGreeksStrikeOptions()) return;
 
     const request = ++state.greeksRequest;
+    const selectedExpiry = state.greeksExpiry;
+    const selectedDte = surface.by_expiry[selectedExpiry].dte;
     try {
       const data = await Api.fetchGreeks(
-        state.greeksExpiry, state.greeksStrike, state.greeksCp, { timeout: 30000 });
-      if (request !== state.greeksRequest || state.view !== "greeks") return;
+        selectedExpiry, state.greeksStrike, state.greeksCp, { timeout: 30000 });
+      if (request !== state.greeksRequest || state.view !== "greeks" ||
+          data.expiry !== selectedExpiry) return;
       state.greeksStrike = data.strike;
       $("greeksBasis").innerHTML =
         chipHtml("SPOT", Fmt.fmtStrike(data.spot)) +
@@ -417,8 +420,9 @@
         spot: { suffix: "spot", label: "Spot", actual: data.spot, formatter: Fmt.fmtStrike },
         volatility: { suffix: "vol", label: "Implied volatility", actual: data.iv_pct,
           formatter: (value) => Number(value).toFixed(1) + "%" },
-        time: { suffix: "time", label: "Days to expiry", actual: data.dte,
-          formatter: (value) => value + "d" },
+        time: { suffix: "time", label: "Days to expiry", actual: null,
+          formatter: (value) => value + "d", min: 0, max: selectedDte,
+          showCurrent: false },
       };
       Object.keys(metricOptions).forEach((metric) => {
         const metricConfig = metricOptions[metric];
@@ -430,6 +434,8 @@
             xLabel: axisConfig.label, actualX: axisConfig.actual,
             xFormatter: axisConfig.formatter, yLabel: metricConfig.label,
             yFormatter: metricConfig.formatter, nonnegative: metricConfig.nonnegative,
+            inverse: axisConfig.inverse, xMin: axisConfig.min, xMax: axisConfig.max,
+            showCurrent: axisConfig.showCurrent,
           });
         });
       });

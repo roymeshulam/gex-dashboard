@@ -25,7 +25,7 @@ def test_option_metrics_have_standard_units_and_signs():
     assert metrics["vega"] > 0.0
 
 
-def test_curves_use_selected_and_cycle_implied_volatility():
+def test_curves_use_selected_implied_volatility_and_count_down_to_expiry():
     today = datetime.date(2026, 7, 18)
     contracts = [
         mk(expiry=today + datetime.timedelta(days=10), cp="P", strike=6000,
@@ -40,7 +40,15 @@ def test_curves_use_selected_and_cycle_implied_volatility():
     assert result["iv_pct"] == 20.0
     assert len(result["spot_curve"]) == 61
     assert len(result["volatility_curve"]) == 61
-    assert [row[2] for row in result["time_curve"]] == [20.0, 30.0]
+    assert [row[0] for row in result["time_curve"]] == list(range(10, -1, -1))
+    assert [row[2] for row in result["time_curve"]] == [20.0] * 11
+    assert result["time_curve"][-1][1] == pytest.approx(0.0)
     assert set(result["curves"]) == {"price", "delta", "gamma", "theta", "vega"}
     assert all(set(curves) == {"spot", "volatility", "time"}
                for curves in result["curves"].values())
+
+    later = calculate_curves(surface, "2026-08-17", 6000.0, "P")
+    assert later["dte"] == 30
+    assert later["time_curve"][0][0] == 30
+    assert later["time_curve"][-1][0] == 0
+    assert len(later["time_curve"]) == 31

@@ -141,18 +141,12 @@ def calculate_curves(surface: dict, expiry: str, strike: float, cp: str) -> dict
             curves[metric]["volatility"].append(
                 [round(x * 100.0, 2), round(values[metric], 6)])
 
-    for cycle in surface["expiries"]:
-        cycle_dte = surface["by_expiry"][cycle]["dte"]
-        try:
-            _, cycle_iv = _selected_row(surface, cycle, strike, cp)
-        except ValueError:
-            continue
-        values = option_metrics(
-            spot, strike, max(cycle_dte, 0.25) / 365.0, cycle_iv, cp)
+    for cycle_dte in range(dte, -1, -1):
+        values = option_metrics(spot, strike, cycle_dte / 365.0, iv, cp)
         for metric in metrics:
             curves[metric]["time"].append(
                 [cycle_dte, round(values[metric], 6),
-                 round(cycle_iv * 100.0, 2), cycle])
+                 round(iv * 100.0, 2)])
 
     return {
         "expiry": expiry, "strike": strike, "cp": cp, "spot": round(spot, 2),
