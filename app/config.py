@@ -1,7 +1,15 @@
 """Central configuration: SPX windows, TTLs, and sentiment weights."""
 from __future__ import annotations
 
+import os
+from pathlib import Path
+
 CBOE_BASE = "https://cdn.cboe.com/api/global/delayed_quotes/options/{code}.json"
+CBOE_DISK_CACHE_DIR = Path(os.getenv(
+    "CBOE_DISK_CACHE_DIR",
+    Path(__file__).resolve().parent.parent / ".cache" / "cboe",
+))
+CBOE_DISK_CACHE_TTL_SEC = 3600.0
 
 # The SPX chain includes standard SPX contracts and SPXW weeklies.
 SPX = {

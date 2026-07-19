@@ -140,8 +140,10 @@ def calculate_curves(surface: dict, expiry: str, strike: float, cp: str) -> dict
         for metric in metrics:
             curves[metric]["spot"].append([round(x, 2), round(values[metric], 6)])
 
-    low_iv = max(0.01, iv * 0.35)
-    high_iv = max(low_iv + 0.01, iv * 2.0)
+    # Show a symmetric relative shock around the selected contract's IV:
+    # 50% below through 50% above (for example, 20% IV -> 10%-30%).
+    low_iv = max(0.01, iv * 0.5)
+    high_iv = iv * 1.5
     for index in range(61):
         x = low_iv + (high_iv - low_iv) * index / 60.0
         values = option_metrics(spot, strike, years, x, cp)

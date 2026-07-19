@@ -394,6 +394,8 @@
     const yFormatter = opts.yFormatter || Fmt.fmtPrice;
     const inst = chart(el, 360);
     const actual = opts.actualX;
+    const actualLabel = actual === null || actual === undefined ? ""
+      : opts.xFormatter ? opts.xFormatter(actual) : actual;
     inst.setOption({
       animation: false,
       grid: { left: 58, right: 18, top: 44, bottom: 48 },
@@ -433,7 +435,7 @@
           ? undefined : {
           symbol: "none", silent: true,
           lineStyle: { color: AMBER, type: "dashed" },
-          label: { formatter: "CURRENT", color: AMBER, fontSize: 9 },
+          label: { formatter: String(actualLabel), color: AMBER, fontSize: 9 },
           data: [{ xAxis: actual }],
         },
       }],

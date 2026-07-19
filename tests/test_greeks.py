@@ -45,6 +45,11 @@ def test_curves_use_selected_implied_volatility_and_count_down_to_expiry():
     assert result["spot_curve"][-1][0] == result["spot_upper"]
     assert len(result["spot_curve"]) == 61
     assert len(result["volatility_curve"]) == 61
+    assert result["volatility_curve"][0][0] == 10.0
+    assert result["volatility_curve"][-1][0] == 30.0
+    assert result["volatility_curve"][30][0] == result["iv_pct"]
+    assert result["volatility_curve"][0][1] < result["volatility_curve"][30][1]
+    assert result["volatility_curve"][30][1] < result["volatility_curve"][-1][1]
     assert [row[0] for row in result["time_curve"]] == list(range(10, -1, -1))
     assert [row[2] for row in result["time_curve"]] == [20.0] * 11
     assert result["time_curve"][-1][1] == pytest.approx(0.0)

@@ -8,8 +8,14 @@ from __future__ import annotations
 
 import asyncio
 import datetime
+import gzip
+import json
 import logging
+import os
 import re
+import threading
+import time
+from pathlib import Path
 from typing import Optional, Tuple
 from zoneinfo import ZoneInfo
 
@@ -39,6 +45,40 @@ class CboeParseError(CboeError):
 
 class OccParseError(CboeError):
     pass
+
+
+def _cache_path(code: str) -> Path:
+    safe_code = re.sub(r"[^A-Za-z0-9_-]", "_", code)
+    return config.CBOE_DISK_CACHE_DIR / f"{safe_code}.json.gz"
+
+
+def _read_disk_cache(code: str, allow_stale: bool = False) -> Optional[dict]:
+    path = _cache_path(code)
+    try:
+        age = time.time() - path.stat().st_mtime
+        if not allow_stale and age >= config.CBOE_DISK_CACHE_TTL_SEC:
+            return None
+        with gzip.open(path, "rt", encoding="utf-8") as source:
+            cached = json.load(source)
+        return cached if isinstance(cached, dict) else None
+    except (FileNotFoundError, OSError, ValueError, TypeError):
+        return None
+
+
+def _write_disk_cache(code: str, content: bytes) -> None:
+    path = _cache_path(code)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    temporary = path.with_name(
+        f"{path.name}.{os.getpid()}.{threading.get_ident()}.tmp")
+    try:
+        with gzip.open(temporary, "wb", compresslevel=6) as target:
+            target.write(content)
+        os.replace(temporary, path)
+    finally:
+        try:
+            temporary.unlink()
+        except FileNotFoundError:
+            pass
 
 
 def parse_occ(occ: str) -> Tuple[str, datetime.date, str, float]:
@@ -146,6 +186,11 @@ def normalize(raw: dict, today: Optional[datetime.date] = None) -> ChainData:
 
 
 async def _get_json(client: httpx.AsyncClient, code: str) -> dict:
+    cached = await asyncio.to_thread(_read_disk_cache, code)
+    if cached is not None:
+        log.info("CBOE disk cache hit for %s", code)
+        return cached
+
     url = config.CBOE_BASE.format(code=code)
     last_exc: Optional[Exception] = None
     for attempt in range(1 + config.FETCH_RETRIES):
@@ -155,13 +200,25 @@ async def _get_json(client: httpx.AsyncClient, code: str) -> dict:
                 raise CboeUnavailable(f"CBOE {resp.status_code} for {code}")
             if resp.status_code != 200:
                 raise CboeParseError(f"CBOE {resp.status_code} for {code}")
-            return resp.json()
+            parsed = resp.json()
+            if not isinstance(parsed, dict):
+                raise CboeParseError(f"CBOE non-object JSON for {code}")
+            try:
+                await asyncio.to_thread(_write_disk_cache, code, resp.content)
+            except OSError as e:
+                # A read-only or full filesystem must not make market data fail.
+                log.warning("CBOE disk cache write failed for %s: %s", code, e)
+            return parsed
         except (httpx.TransportError, CboeUnavailable) as e:
             last_exc = e
             if attempt < config.FETCH_RETRIES:
                 await asyncio.sleep(config.FETCH_BACKOFF[min(attempt, len(config.FETCH_BACKOFF) - 1)])
         except ValueError as e:  # bad JSON
             raise CboeParseError(f"CBOE bad JSON for {code}: {e}")
+    stale = await asyncio.to_thread(_read_disk_cache, code, True)
+    if stale is not None:
+        log.warning("CBOE unreachable for %s; using stale disk cache", code)
+        return stale
     raise CboeUnavailable(f"CBOE unreachable for {code}: {last_exc}")
 
 
