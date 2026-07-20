@@ -12,7 +12,6 @@
     retries: 0, lastFetch: 0, data: null,
     strikemapExpiry: null, flowExpiry: null, flowMode: "vol",
     greeksExpiry: null, greeksStrike: null, greeksCp: "C", greeksRequest: 0,
-    wakeTimer: null,
   };
 
   const $ = (id) => document.getElementById(id);
@@ -74,9 +73,6 @@
 
     const isFirst = !state.data;
     if (isFirst) {
-      if (state.wakeTimer) clearTimeout(state.wakeTimer);  // no orphan timers
-      state.wakeTimer = setTimeout(() =>
-        banner("Waking the free server — first load can take up to a minute…", "info"), 3000);
       document.body.classList.add("first-load");
     }
 
@@ -100,7 +96,6 @@
       banner(message, "error");
       setChip("retry " + wait + "s", "error");
     } finally {
-      if (state.wakeTimer) { clearTimeout(state.wakeTimer); state.wakeTimer = null; }
       document.body.classList.remove("first-load");
       if (state.abort === ctrl) state.abort = null;
       state.loading = false;
