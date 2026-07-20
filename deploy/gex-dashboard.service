@@ -7,7 +7,7 @@ Wants=network-online.target
 Type=simple
 WorkingDirectory=/home/meshulro/Projects/gex-dashboard
 Environment=PYTHONUNBUFFERED=1
-ExecStart=/home/meshulro/Projects/gex-dashboard/.venv/bin/uvicorn app.main:app --host 0.0.0.0 --port 8000
+ExecStart=/home/meshulro/Projects/gex-dashboard/.venv/bin/uvicorn app.main:app --host 127.0.0.1 --port 8000
 Restart=always
 RestartSec=5
 
