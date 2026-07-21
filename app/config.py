@@ -24,8 +24,8 @@ CONTRACT_MULTIPLIER = 100
 
 MAX_HEATMAP_ROWS = 55      # cap on bucketed strike rows in heatmap/strike map
 MAX_EXPIRATIONS = 14       # heatmap columns
-MAX_STRIKEMAP_EXPIRATIONS = 45
-MAX_FLOW_EXPIRATIONS = 45
+MAX_STRIKEMAP_EXPIRATIONS = 30
+MAX_FLOW_EXPIRATIONS = 30
 TOP_STRIKES = 5            # top +/- GEX strikes in summary tables
 TOP_TRADES = 15            # top flow rows by premium
 
@@ -34,7 +34,6 @@ ZERO_DTE_MAX_ROWS = 40
 
 TTL_OPEN_SEC = 30.0        # cache TTL while market is active
 TTL_CLOSED_SEC = 600.0     # cache TTL when closed (data static)
-VIX_TTL_SEC = 60.0
 
 FETCH_CONNECT_TIMEOUT = 5.0
 FETCH_READ_TIMEOUT = 30.0

@@ -9,7 +9,7 @@ from app import runtime as runtime_module
 async def test_runtime_prewarms_snapshot_cache(monkeypatch):
     calls = {"count": 0}
 
-    async def fake_build_snapshot(_client, _vix_cache):
+    async def fake_build_snapshot(_client):
         calls["count"] += 1
         return {"status": {}}
 

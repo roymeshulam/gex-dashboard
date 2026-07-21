@@ -71,7 +71,7 @@ def test_heatmap_structure_and_conservation():
     assert abs(total_cells - expected) < 0.5
 
 
-def test_expiry_dropdowns_include_thirty_expirations():
+def test_expiry_dropdowns_respect_configured_caps():
     start = datetime.date(2099, 1, 1)
     contracts = [
         mk("C", 7400, gamma=0.001, oi=10, volume=10,
@@ -85,10 +85,14 @@ def test_expiry_dropdowns_include_thirty_expirations():
     option_flow = flow.build_flow(contracts, 7400.0, cfg)
 
     assert len(heatmap["expiries"]) == 14
-    assert len(strikemap["expiries"]) == 31  # dated cycles only; no "ALL"
-    assert len(option_flow["expiries"]) == 31  # dated cycles only; no "ALL"
-    assert strikemap["expiries"][-1] == (start + datetime.timedelta(days=30)).isoformat()
-    assert option_flow["expiries"][-1] == (start + datetime.timedelta(days=30)).isoformat()
+    assert len(strikemap["expiries"]) == config.MAX_STRIKEMAP_EXPIRATIONS
+    assert len(option_flow["expiries"]) == config.MAX_FLOW_EXPIRATIONS
+    assert strikemap["expiries"][-1] == (
+        start + datetime.timedelta(days=config.MAX_STRIKEMAP_EXPIRATIONS - 1)
+    ).isoformat()
+    assert option_flow["expiries"][-1] == (
+        start + datetime.timedelta(days=config.MAX_FLOW_EXPIRATIONS - 1)
+    ).isoformat()
 
 
 def test_flow_includes_open_interest_and_available_bid_ask_spreads():

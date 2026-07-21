@@ -10,7 +10,6 @@ import httpx
 from . import config
 from .cache import SnapshotCache
 from .engine import snapshot as snapshot_engine
-from .engine.snapshot import VixCache
 
 log = logging.getLogger(__name__)
 
@@ -19,7 +18,6 @@ class Runtime:
     def __init__(self) -> None:
         self.client: Optional[httpx.AsyncClient] = None
         self.cache = SnapshotCache()
-        self.vix_cache = VixCache()
         self._warm_task: Optional[asyncio.Task] = None
 
     async def start(self, prewarm: bool = True) -> None:
@@ -62,7 +60,7 @@ class Runtime:
             raise RuntimeError("application services are not running")
         return await self.cache.get(
             "SPX",
-            lambda: snapshot_engine.build_snapshot(self.client, self.vix_cache),
+            lambda: snapshot_engine.build_snapshot(self.client),
         )
 
 

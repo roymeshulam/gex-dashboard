@@ -4,6 +4,7 @@ import asyncio
 
 import pytest
 
+from app import config
 from app.cache import SnapshotCache
 
 
@@ -79,3 +80,27 @@ async def test_cold_failure_raises():
 
     with pytest.raises(RuntimeError):
         await cache.get("SPX", builder)
+
+
+def test_snapshot_ttl_is_not_shorter_than_cboe_disk_cache(monkeypatch):
+    monkeypatch.setattr(config, "TTL_OPEN_SEC", 30.0)
+    monkeypatch.setattr(config, "TTL_CLOSED_SEC", 600.0)
+    monkeypatch.setattr(config, "CBOE_DISK_CACHE_TTL_SEC", 3600.0)
+
+    assert SnapshotCache.ttl() == 3600.0
+
+
+@pytest.mark.asyncio
+async def test_cache_age_uses_upstream_source_timestamp(monkeypatch):
+    now = 10_000.0
+    monkeypatch.setattr("app.cache.time.time", lambda: now)
+    cache = SnapshotCache()
+
+    async def builder():
+        return {"v": 1, "_source_fetched_at": now - 900.0}
+
+    bundle, meta = await cache.get("SPX", builder)
+
+    assert bundle["v"] == 1
+    assert cache._entries["SPX"].fetched_at == now - 900.0
+    assert meta["cache_age_sec"] == 900.0

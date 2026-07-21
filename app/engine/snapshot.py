@@ -9,13 +9,10 @@ from __future__ import annotations
 import asyncio
 import datetime
 import logging
-import time
-from typing import Optional
 
 import httpx
 
 from .. import config, market
-from ..models import VixData
 from ..providers import cboe
 from . import flow as flow_engine
 from . import gex as gex_engine
@@ -27,38 +24,23 @@ log = logging.getLogger(__name__)
 FETCH_SEMAPHORE = asyncio.Semaphore(1)
 
 
-class VixCache:
-    """Tiny TTL cache for the VIX quote; failures degrade to None."""
-
-    def __init__(self):
-        self._vix: Optional[VixData] = None
-        self._at = 0.0
-        self._lock = asyncio.Lock()
-
-    async def get(self, client: httpx.AsyncClient) -> Optional[VixData]:
-        if self._vix is not None and time.time() - self._at < config.VIX_TTL_SEC:
-            return self._vix
-        async with self._lock:
-            if self._vix is not None and time.time() - self._at < config.VIX_TTL_SEC:
-                return self._vix
-            try:
-                self._vix = await cboe.fetch_vix(client)
-                self._at = time.time()
-            except cboe.CboeError as e:
-                log.warning("VIX fetch failed: %s", e)
-        return self._vix
-
-
-async def build_snapshot(client: httpx.AsyncClient, vix_cache: VixCache) -> dict:
+async def build_snapshot(client: httpx.AsyncClient) -> dict:
     cfg = config.SPX
 
     async def fetch_chain_once():
         async with FETCH_SEMAPHORE:
             return await cboe.fetch_chain(client)
 
+    async def fetch_vix_once():
+        try:
+            return await cboe.fetch_vix(client)
+        except cboe.CboeError as error:
+            log.warning("VIX fetch failed: %s", error)
+            return None
+
     # Both requests are independent. Starting them together removes the VIX
     # round trip from the cold snapshot's critical path.
-    chain, vix = await asyncio.gather(fetch_chain_once(), vix_cache.get(client))
+    chain, vix = await asyncio.gather(fetch_chain_once(), fetch_vix_once())
 
     spot = chain.spot
     today = market.today_expiry_date()
@@ -108,6 +90,9 @@ async def build_snapshot(client: httpx.AsyncClient, vix_cache: VixCache) -> dict
     }
 
     return {
+        # SnapshotCache uses the upstream payload timestamp so its hourly
+        # lifetime stays synchronized with the CBOE disk cache across restarts.
+        "_source_fetched_at": chain.source_fetched_at or chain.data_ts.timestamp(),
         "status": status,
         "heatmap": heatmap,
         "strikemap": strikemap,

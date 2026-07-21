@@ -29,9 +29,10 @@
       const v = encodeURIComponent(views || "summary");
       return getJSON("/api/spx/snapshot?views=" + v, opts);
     },
-    fetchGreeks(expiry, strike, cp, opts) {
+    fetchGreeks(expiry, strike, cp, position, opts) {
       const query = "expiry=" + encodeURIComponent(expiry) +
-        "&strike=" + encodeURIComponent(strike) + "&cp=" + encodeURIComponent(cp);
+        "&strike=" + encodeURIComponent(strike) + "&cp=" + encodeURIComponent(cp) +
+        "&position=" + encodeURIComponent(position);
       return getJSON("/api/spx/greeks?" + query, opts);
     },
   };

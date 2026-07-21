@@ -32,6 +32,7 @@ class ChainData:
     data_ts: datetime.datetime        # tz-aware (ET source)
     last_trade_time: datetime.datetime  # tz-aware (ET source)
     contracts: List[Contract] = field(default_factory=list)
+    source_fetched_at: Optional[float] = None  # disk-cache write/download time
 
 
 @dataclass

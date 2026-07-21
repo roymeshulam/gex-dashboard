@@ -440,7 +440,6 @@
         },
       }],
     }, { notMerge: true });
-    inst.resize();
   }
 
   window.Charts = {

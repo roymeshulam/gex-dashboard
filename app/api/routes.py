@@ -121,10 +121,11 @@ async def expiry_levels(request: Request, dte: list[str] = Query(...)):
 
 @router.get("/spx/greeks")
 async def greeks_curves(request: Request, expiry: str, strike: float,
-                        cp: str = Query(default="C", pattern="^[CPcp]$")):
+                        cp: str = Query(default="C", pattern="^[CPcp]$"),
+                        position: str = Query(default="long", pattern="^(long|short)$")):
     try:
         bundle, _cache_meta = await _get_bundle(request)
-        return calculate_curves(bundle["_greeks_surface"], expiry, strike, cp)
+        return calculate_curves(bundle["_greeks_surface"], expiry, strike, cp, position)
     except CboeError as e:
         log.error("SPX Greeks calculation failed: %s", e)
         raise HTTPException(status_code=503, detail="upstream data unavailable")

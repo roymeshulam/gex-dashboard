@@ -1,17 +1,16 @@
-/* App controller: hash router, 30s poll with countdown + visibility pause,
-   status row, per-view rendering. */
+/* App controller: hash router, data loading, status row, per-view rendering. */
 (function () {
   "use strict";
 
-  const REFRESH_SEC = 30;
   const VIEWS = ["heatmap", "strikemap", "zerodte", "flow", "greeks", "sentiment", "volatility"];
 
   const state = {
     view: "heatmap",
-    countdown: REFRESH_SEC, loading: false, abort: null,
-    retries: 0, lastFetch: 0, data: null,
+    loading: false, abort: null, data: null,
     strikemapExpiry: null, flowExpiry: null, flowMode: "vol",
-    greeksExpiry: null, greeksStrike: null, greeksCp: "C", greeksRequest: 0,
+    greeksExpiry: null, greeksStrike: null, greeksCp: "C", greeksPosition: "long",
+    greeksRequest: 0,
+    greeksAbort: null,
   };
 
   const $ = (id) => document.getElementById(id);
@@ -34,6 +33,8 @@
   function applyRoute() {
     const view = parseHash();
     const changed = view !== state.view;
+    if (changed && view !== "greeks" && state.greeksAbort) state.greeksAbort.abort();
+    if (changed && view !== "greeks") state.greeksRequest++;
     state.view = view;
     try { localStorage.setItem("gexdash.route", location.hash); } catch (e) {}
 
@@ -49,13 +50,7 @@
     else renderAll();
   }
 
-  /* ------------------------------ polling ------------------------------ */
-
-  function setChip(text, cls) {
-    const chip = $("refreshChip");
-    chip.textContent = text;
-    chip.className = "chip " + (cls || "");
-  }
+  /* ---------------------------- data loading ---------------------------- */
 
   function banner(msg, cls) {
     const el = $("banner");
@@ -69,7 +64,6 @@
     const ctrl = new AbortController();
     state.abort = ctrl;
     state.loading = true;
-    setChip("updating…", "busy");
 
     const isFirst = !state.data;
     if (isFirst) {
@@ -77,43 +71,27 @@
     }
 
     try {
-      state.data = await Api.fetchSnapshot(
+      const previousTimestamp = state.data && state.data.meta.data_timestamp;
+      const data = await Api.fetchSnapshot(
         state.view === "heatmap" ? "heatmap" : state.view,
         { signal: ctrl.signal, timeout: isFirst ? 90000 : 30000 });
-      state.retries = 0;
-      state.countdown = REFRESH_SEC;
+      const hasNewData = isFirst || data.meta.data_timestamp !== previousTimestamp;
+      state.data = data;
       banner(null);
-      renderAll();
+      if (hasNewData) renderAll();
     } catch (e) {
       if (ctrl.signal.aborted) return;
       console.error("Dashboard refresh failed", e);
-      state.retries += 1;
-      const wait = Math.min(5 * Math.pow(2, state.retries - 1), 20);
-      state.countdown = wait;
       const message = window.echarts
-        ? "Data fetch failed — retrying in " + wait + "s"
-        : "Chart library failed to load — retrying in " + wait + "s";
+        ? "Data fetch failed — reload the page to try again"
+        : "Chart library failed to load — reload the page to try again";
       banner(message, "error");
-      setChip("retry " + wait + "s", "error");
     } finally {
       document.body.classList.remove("first-load");
       if (state.abort === ctrl) state.abort = null;
       state.loading = false;
-      state.lastFetch = Date.now();
     }
   }
-
-  setInterval(() => {
-    if (document.hidden || state.loading) return;
-    state.countdown -= 1;
-    if (state.countdown <= 0) { refresh(); return; }
-    if (state.retries === 0) setChip("↻ " + state.countdown + "s");
-  }, 1000);
-
-  document.addEventListener("visibilitychange", () => {
-    if (!document.hidden &&
-        Date.now() - state.lastFetch > REFRESH_SEC * 1000) refresh();
-  });
 
   /* ----------------------------- rendering ----------------------------- */
 
@@ -381,21 +359,71 @@
     return true;
   }
 
+  function syncGreeksTypeToggle() {
+    const toggle = $("greeksTypeToggle");
+    const isCall = state.greeksCp === "C";
+    toggle.textContent = isCall ? "Call" : "Put";
+    toggle.setAttribute("aria-label", "Option type: " + (isCall ? "Call" : "Put") +
+      ". Click to show " + (isCall ? "puts" : "calls"));
+  }
+
+  function syncGreeksPositionToggle() {
+    const toggle = $("greeksPositionToggle");
+    const isLong = state.greeksPosition === "long";
+    toggle.textContent = isLong ? "Long" : "Short";
+    toggle.setAttribute("aria-label", "Position: " + (isLong ? "Long" : "Short") +
+      ". Click to show " + (isLong ? "short" : "long") + " exposure");
+  }
+
+  function nextAnimationFrame() {
+    return new Promise((resolve) => requestAnimationFrame(resolve));
+  }
+
+  async function renderGreeksCharts(data, axes, metricOptions, request) {
+    const jobs = [];
+    Object.keys(metricOptions).forEach((metric) => {
+      const metricConfig = metricOptions[metric];
+      Object.keys(axes).forEach((axis) => {
+        const axisConfig = axes[axis];
+        const id = metric === "price" ? "chart-greeks-" + axisConfig.suffix
+          : "chart-" + metric + "-" + axisConfig.suffix;
+        jobs.push(() => Charts.renderPriceCurve($(id), data.curves[metric][axis], {
+          xLabel: axisConfig.label, actualX: axisConfig.actual,
+          xFormatter: axisConfig.formatter, yLabel: metricConfig.label,
+          yFormatter: metricConfig.formatter, nonnegative: metricConfig.nonnegative,
+          inverse: axisConfig.inverse, xMin: axisConfig.min, xMax: axisConfig.max,
+          showCurrent: axisConfig.showCurrent,
+        }));
+      });
+    });
+
+    const chartsPerFrame = 3;
+    for (let index = 0; index < jobs.length; index += chartsPerFrame) {
+      if (request !== state.greeksRequest || state.view !== "greeks") return;
+      jobs.slice(index, index + chartsPerFrame).forEach((job) => job());
+      if (index + chartsPerFrame < jobs.length) await nextAnimationFrame();
+    }
+  }
+
   async function renderGreeksView() {
     const surface = state.data.views.greeks;
     if (!surface || !surface.expiries.length) return;
     if (!surface.expiries.includes(state.greeksExpiry)) state.greeksExpiry = surface.expiries[0];
     fillExpirySelect($("greeksExpirySelect"), surface.expiries, state.greeksExpiry);
-    document.querySelectorAll("#greeksTypeBtns button").forEach((button) =>
-      button.classList.toggle("active", button.dataset.cp === state.greeksCp));
+    syncGreeksTypeToggle();
+    syncGreeksPositionToggle();
     if (!setGreeksStrikeOptions()) return;
 
     const request = ++state.greeksRequest;
+    if (state.greeksAbort) state.greeksAbort.abort();
+    const ctrl = new AbortController();
+    state.greeksAbort = ctrl;
     const selectedExpiry = state.greeksExpiry;
     const selectedDte = surface.by_expiry[selectedExpiry].dte;
     try {
       const data = await Api.fetchGreeks(
-        selectedExpiry, state.greeksStrike, state.greeksCp, { timeout: 30000 });
+        selectedExpiry, state.greeksStrike, state.greeksCp, state.greeksPosition,
+        { signal: ctrl.signal, timeout: 30000 });
       if (request !== state.greeksRequest || state.view !== "greeks" ||
           data.expiry !== selectedExpiry) return;
       state.greeksStrike = data.strike;
@@ -404,12 +432,13 @@
         chipHtml("DTE", data.dte) +
         chipHtml("IMPLIED VOL", data.iv_pct.toFixed(2) + "%") +
         chipHtml("RATE", data.rate_pct.toFixed(2) + "%");
+      const isLong = data.position === "long";
       const metricOptions = {
-        price: { label: "Option price", formatter: Fmt.fmtPrice, nonnegative: true },
+        price: { label: "Position value", formatter: Fmt.fmtPrice, nonnegative: isLong },
         delta: { label: "Delta", formatter: (value) => Number(value).toFixed(3) },
-        gamma: { label: "Gamma", formatter: (value) => Number(value).toFixed(5), nonnegative: true },
+        gamma: { label: "Gamma", formatter: (value) => Number(value).toFixed(5), nonnegative: isLong },
         theta: { label: "Theta / day", formatter: (value) => Number(value).toFixed(2) },
-        vega: { label: "Vega / 1% IV", formatter: (value) => Number(value).toFixed(2), nonnegative: true },
+        vega: { label: "Vega / 1% IV", formatter: (value) => Number(value).toFixed(2), nonnegative: isLong },
       };
       const axes = {
         spot: { suffix: "spot", label: "Spot", actual: data.spot, formatter: Fmt.fmtStrike,
@@ -420,23 +449,13 @@
           formatter: (value) => value + "d", min: 0, max: selectedDte,
           showCurrent: false },
       };
-      Object.keys(metricOptions).forEach((metric) => {
-        const metricConfig = metricOptions[metric];
-        Object.keys(axes).forEach((axis) => {
-          const axisConfig = axes[axis];
-          const id = metric === "price" ? "chart-greeks-" + axisConfig.suffix
-            : "chart-" + metric + "-" + axisConfig.suffix;
-          Charts.renderPriceCurve($(id), data.curves[metric][axis], {
-            xLabel: axisConfig.label, actualX: axisConfig.actual,
-            xFormatter: axisConfig.formatter, yLabel: metricConfig.label,
-            yFormatter: metricConfig.formatter, nonnegative: metricConfig.nonnegative,
-            inverse: axisConfig.inverse, xMin: axisConfig.min, xMax: axisConfig.max,
-            showCurrent: axisConfig.showCurrent,
-          });
-        });
-      });
+      await renderGreeksCharts(data, axes, metricOptions, request);
     } catch (error) {
-      if (request === state.greeksRequest) banner("Unable to calculate option curves: " + error.message, "error");
+      if (error.name !== "AbortError" && request === state.greeksRequest) {
+        banner("Unable to calculate option curves: " + error.message, "error");
+      }
+    } finally {
+      if (state.greeksAbort === ctrl) state.greeksAbort = null;
     }
   }
 
@@ -473,10 +492,15 @@
   $("greeksStrikeSelect").addEventListener("change", (e) => {
     state.greeksStrike = Number(e.target.value); renderGreeksView();
   });
-  document.querySelectorAll("#greeksTypeBtns button").forEach((button) =>
-    button.addEventListener("click", () => {
-      state.greeksCp = button.dataset.cp; state.greeksStrike = null; renderGreeksView();
-    }));
+  $("greeksTypeToggle").addEventListener("click", () => {
+    state.greeksCp = state.greeksCp === "C" ? "P" : "C";
+    state.greeksStrike = null;
+    renderGreeksView();
+  });
+  $("greeksPositionToggle").addEventListener("click", () => {
+    state.greeksPosition = state.greeksPosition === "long" ? "short" : "long";
+    renderGreeksView();
+  });
   document.querySelectorAll("#flowModeBtns button").forEach((b) =>
     b.addEventListener("click", () => {
       state.flowMode = b.dataset.mode; renderFlowView();

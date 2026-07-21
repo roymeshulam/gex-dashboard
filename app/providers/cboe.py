@@ -127,7 +127,8 @@ def _optional_f(v) -> Optional[float]:
         return None
 
 
-def normalize(raw: dict, today: Optional[datetime.date] = None) -> ChainData:
+def normalize(raw: dict, today: Optional[datetime.date] = None,
+              source_fetched_at: Optional[float] = None) -> ChainData:
     """Raw CBOE JSON -> ChainData. Filters to SPX OCC roots, drops
     expired contracts, coerces missing numerics to 0. The (large) raw dict is
     not retained."""
@@ -182,6 +183,7 @@ def normalize(raw: dict, today: Optional[datetime.date] = None) -> ChainData:
         iv30=_optional_f(data.get("iv30")),
         iv30_change_pct=_optional_f(data.get("iv30_change_percent")),
         data_ts=data_ts, last_trade_time=ltt, contracts=contracts,
+        source_fetched_at=source_fetched_at,
     )
 
 
@@ -223,8 +225,13 @@ async def _get_json(client: httpx.AsyncClient, code: str) -> dict:
 
 
 async def fetch_chain(client: httpx.AsyncClient) -> ChainData:
-    raw = await _get_json(client, config.SPX["cboe_code"])
-    return normalize(raw)
+    code = config.SPX["cboe_code"]
+    raw = await _get_json(client, code)
+    try:
+        source_fetched_at = _cache_path(code).stat().st_mtime
+    except OSError:
+        source_fetched_at = time.time()
+    return normalize(raw, source_fetched_at=source_fetched_at)
 
 
 async def fetch_vix(client: httpx.AsyncClient) -> VixData:

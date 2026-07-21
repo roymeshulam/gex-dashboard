@@ -9,6 +9,7 @@ from ..models import Contract
 
 RISK_FREE_RATE = 0.043
 DIVIDEND_YIELD = 0.0
+MAX_TIME_CURVE_POINTS = 121
 
 
 def _normal_cdf(value: float) -> float:
@@ -117,10 +118,14 @@ def _selected_row(surface: dict, expiry: str, strike: float, cp: str) -> tuple[f
     return row[0], row[iv_index]
 
 
-def calculate_curves(surface: dict, expiry: str, strike: float, cp: str) -> dict:
+def calculate_curves(surface: dict, expiry: str, strike: float, cp: str,
+                     position: str = "long") -> dict:
     cp = cp.upper()
     if cp not in {"C", "P"}:
         raise ValueError("cp must be C or P")
+    position = position.lower()
+    if position not in {"long", "short"}:
+        raise ValueError("position must be long or short")
     if expiry not in surface["by_expiry"]:
         raise ValueError("unknown expiry")
 
@@ -151,15 +156,31 @@ def calculate_curves(surface: dict, expiry: str, strike: float, cp: str) -> dict
             curves[metric]["volatility"].append(
                 [round(x * 100.0, 2), round(values[metric], 6)])
 
-    for cycle_dte in range(dte, -1, -1):
+    if dte + 1 <= MAX_TIME_CURVE_POINTS:
+        time_dtes = range(dte, -1, -1)
+    else:
+        # Keep the payload and canvas work bounded for long-dated contracts
+        # while retaining the selected-DTE and expiry endpoints.
+        time_dtes = [
+            round(dte - index * dte / (MAX_TIME_CURVE_POINTS - 1))
+            for index in range(MAX_TIME_CURVE_POINTS)
+        ]
+    for cycle_dte in time_dtes:
         values = option_metrics(spot, strike, cycle_dte / 365.0, iv, cp)
         for metric in metrics:
             curves[metric]["time"].append(
                 [cycle_dte, round(values[metric], 6),
                  round(iv * 100.0, 2)])
 
+    if position == "short":
+        for metric_curves in curves.values():
+            for rows in metric_curves.values():
+                for row in rows:
+                    row[1] = round(-row[1], 6)
+
     return {
-        "expiry": expiry, "strike": strike, "cp": cp, "spot": round(spot, 2),
+        "expiry": expiry, "strike": strike, "cp": cp, "position": position,
+        "spot": round(spot, 2),
         "dte": dte, "iv_pct": round(iv * 100.0, 2),
         "expected_move": round(expected_move, 2),
         "spot_lower": spot_lower, "spot_upper": spot_upper,

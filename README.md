@@ -5,7 +5,7 @@
 Free, self-hosted **SPX gamma-exposure dashboard** in the style of
 spxgexheatmap.com: GEX heatmap, strike map with walls & gamma flip, 0DTE
 roadmap, option flow, and a composite sentiment gauge. Mobile-friendly with a
-bottom tab bar, auto-refreshing every 30 s.
+bottom tab bar.
 The header Guide link remains available on mobile, with symbol controls
 wrapping onto a second row on narrow screens.
 

@@ -62,3 +62,41 @@ def test_curves_use_selected_implied_volatility_and_count_down_to_expiry():
     assert later["time_curve"][0][0] == 30
     assert later["time_curve"][-1][0] == 0
     assert len(later["time_curve"]) == 31
+
+
+def test_long_time_curves_are_downsampled_with_endpoints_preserved():
+    today = datetime.date(2026, 7, 18)
+    expiry = today + datetime.timedelta(days=730)
+    surface = build_surface([
+        mk(expiry=expiry, cp="C", strike=6000, iv=0.20, bid=10, ask=11),
+    ], 6000.0, today)
+
+    result = calculate_curves(surface, expiry.isoformat(), 6000.0, "C")
+    dtes = [row[0] for row in result["time_curve"]]
+
+    assert len(dtes) == 121
+    assert dtes[0] == 730
+    assert dtes[-1] == 0
+    assert all(left > right for left, right in zip(dtes, dtes[1:]))
+
+
+def test_short_position_inverts_price_and_all_greeks():
+    today = datetime.date(2026, 7, 18)
+    expiry = today + datetime.timedelta(days=30)
+    surface = build_surface([
+        mk(expiry=expiry, cp="C", strike=6000, iv=0.20, bid=10, ask=11),
+    ], 6000.0, today)
+
+    long = calculate_curves(surface, expiry.isoformat(), 6000.0, "C", "long")
+    short = calculate_curves(surface, expiry.isoformat(), 6000.0, "C", "short")
+
+    assert long["position"] == "long"
+    assert short["position"] == "short"
+    for metric in long["curves"]:
+        for axis in long["curves"][metric]:
+            assert [row[0] for row in short["curves"][metric][axis]] == [
+                row[0] for row in long["curves"][metric][axis]
+            ]
+            assert [row[1] for row in short["curves"][metric][axis]] == pytest.approx([
+                -row[1] for row in long["curves"][metric][axis]
+            ])

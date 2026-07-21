@@ -37,7 +37,19 @@ class SnapshotCache:
 
     @staticmethod
     def ttl() -> float:
-        return config.TTL_OPEN_SEC if market.is_active_window() else config.TTL_CLOSED_SEC
+        snapshot_ttl = (config.TTL_OPEN_SEC if market.is_active_window()
+                        else config.TTL_CLOSED_SEC)
+        # Recomputing the snapshot while the provider can only return the same
+        # hourly disk-cached chain wastes CPU and causes needless UI redraws.
+        return max(snapshot_ttl, config.CBOE_DISK_CACHE_TTL_SEC)
+
+    @staticmethod
+    def _bundle_fetched_at(bundle: dict, fallback: float) -> float:
+        """Anchor cache age to the CBOE payload, including after a restart."""
+        value = bundle.get("_source_fetched_at")
+        if isinstance(value, (int, float)) and 0.0 < value <= fallback:
+            return float(value)
+        return fallback
 
     async def get(self, key: str,
                   builder: Callable[[], Awaitable[dict]]) -> Tuple[dict, dict]:
@@ -66,8 +78,11 @@ class SnapshotCache:
                                                 stale=False, refreshing=False,
                                                 error=entry.error)
             bundle = await builder()
-            self._entries[key] = _Entry(bundle, time.time())
-            return bundle, self._meta(0.0, stale=False, refreshing=False, error=None)
+            now = time.time()
+            fetched_at = self._bundle_fetched_at(bundle, now)
+            self._entries[key] = _Entry(bundle, fetched_at)
+            return bundle, self._meta(now - fetched_at, stale=False,
+                                      refreshing=False, error=None)
 
     async def _refresh(self, key: str, builder) -> None:
         entry = self._entries.get(key)
@@ -80,7 +95,8 @@ class SnapshotCache:
             return
         if entry is not None:
             entry.bundle = bundle
-            entry.fetched_at = time.time()
+            now = time.time()
+            entry.fetched_at = self._bundle_fetched_at(bundle, now)
             entry.error = None
             entry.task = None
         else:
