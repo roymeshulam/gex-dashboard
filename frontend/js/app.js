@@ -2,11 +2,13 @@
 (function () {
   "use strict";
 
+  const REFRESH_MS = 30000;
+  const RETRY_MS = 5000;
   const VIEWS = ["heatmap", "strikemap", "zerodte", "flow", "greeks", "sentiment", "volatility"];
 
   const state = {
     view: "heatmap",
-    loading: false, abort: null, data: null,
+    loading: false, abort: null, data: null, refreshTimer: null,
     strikemapExpiry: null, flowExpiry: null, flowMode: "vol",
     greeksExpiry: null, greeksStrike: null, greeksCp: "C", greeksPosition: "long",
     greeksRequest: 0,
@@ -79,6 +81,7 @@
       state.data = data;
       banner(null);
       if (hasNewData) renderAll();
+      scheduleRefresh();
     } catch (e) {
       if (ctrl.signal.aborted) return;
       console.error("Dashboard refresh failed", e);
@@ -86,12 +89,25 @@
         ? "Data fetch failed — reload the page to try again"
         : "Chart library failed to load — reload the page to try again";
       banner(message, "error");
+      scheduleRefresh(RETRY_MS);
     } finally {
       document.body.classList.remove("first-load");
       if (state.abort === ctrl) state.abort = null;
       state.loading = false;
     }
   }
+
+  function scheduleRefresh(delay) {
+    if (state.refreshTimer) clearTimeout(state.refreshTimer);
+    state.refreshTimer = setTimeout(() => {
+      state.refreshTimer = null;
+      if (!document.hidden && !state.loading) refresh();
+    }, delay || REFRESH_MS);
+  }
+
+  document.addEventListener("visibilitychange", () => {
+    if (!document.hidden && !state.loading) refresh();
+  });
 
   /* ----------------------------- rendering ----------------------------- */
 
