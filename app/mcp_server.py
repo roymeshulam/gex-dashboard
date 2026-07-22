@@ -27,12 +27,14 @@ mcp = FastMCP(
     streamable_http_path="/",
     transport_security=TransportSecuritySettings(
         allowed_hosts=[
-            "gex.trading-trust.com",
+            "gex.roymeshulam.com",
             "localhost:*",
             "127.0.0.1:*",
         ],
         allowed_origins=[
-            "https://gex.trading-trust.com",
+            "https://gex.roymeshulam.com",
+            "https://chatgpt.com",
+            "https://chat.openai.com",
             "http://localhost:*",
             "http://127.0.0.1:*",
         ],

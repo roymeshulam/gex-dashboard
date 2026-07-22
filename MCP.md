@@ -6,7 +6,7 @@ the REST API.
 
 ## Connection
 
-- Production URL: `https://gex.trading-trust.com/mcp`
+- Production URL: `https://gex.roymeshulam.com/mcp/`
 - Local URL: `http://localhost:8000/mcp`
 - Transport: Streamable HTTP
 - Authentication: none
@@ -18,7 +18,7 @@ Example MCP client configuration:
   "mcpServers": {
     "spx-gamma-levels": {
       "type": "http",
-      "url": "https://gex.trading-trust.com/mcp"
+      "url": "https://gex.roymeshulam.com/mcp/"
     }
   }
 }
@@ -27,7 +27,7 @@ Example MCP client configuration:
 For clients with a CLI similar to Claude Code:
 
 ```bash
-claude mcp add --transport http spx-gamma-levels https://gex.trading-trust.com/mcp
+claude mcp add --transport http spx-gamma-levels https://gex.roymeshulam.com/mcp/
 ```
 
 ## Tool

@@ -18,6 +18,16 @@ async def test_mcp_tool_metadata_describes_agent_input():
     assert "dte" in tool.inputSchema["properties"]
 
 
+def test_mcp_transport_allows_production_hostname():
+    security = mcp_server.mcp.settings.transport_security
+    assert security is not None
+
+    assert "gex.roymeshulam.com" in security.allowed_hosts
+    assert "https://gex.roymeshulam.com" in security.allowed_origins
+    assert "https://chatgpt.com" in security.allowed_origins
+    assert "https://chat.openai.com" in security.allowed_origins
+
+
 @pytest.mark.asyncio
 async def test_mcp_tool_returns_single_or_array(monkeypatch):
     async def fake_get_bundle():

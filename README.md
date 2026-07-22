@@ -53,7 +53,8 @@ Open the [dashboard](http://localhost:8000) and the
 
 ## MCP for LLM agents
 
-The server also exposes a read-only Streamable HTTP MCP endpoint at `/mcp`.
+The server also exposes a read-only Streamable HTTP MCP endpoint at
+`https://gex.roymeshulam.com/mcp/`.
 Its `get_spx_gamma_levels` tool accepts one calendar DTE/ISO expiry or an array
 and returns the same cached call wall, gamma flip, and put wall data as the
 REST API. Tool instructions and JSON Schema are advertised during MCP tool
