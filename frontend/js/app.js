@@ -6,7 +6,7 @@
   const RETRY_MS = 5000;
   const VIEWS = ["heatmap", "strikemap", "zerodte", "flow", "greeks",
     "sentiment", "volatility", "expected_ranges"];
-  const PREFERRED_EXPECTED_RANGE_DTES = new Set([14, 28, 42, 56]);
+  const PREFERRED_EXPECTED_RANGE_DTES = [14, 28, 42, 56];
 
   const state = {
     view: "heatmap",
@@ -355,13 +355,33 @@
       $("chart-expected-move-term"), vol.expected_move_term_structure || []);
   }
 
+  function preferredExpectedRangeDtes(rows) {
+    const available = Array.from(new Set(rows.map((row) => Number(row.dte))
+      .filter(Number.isFinite))).sort((a, b) => a - b);
+    const selected = new Set();
+    PREFERRED_EXPECTED_RANGE_DTES.slice().sort((a, b) => b - a).forEach((target) => {
+      const above = available.find((dte) => dte >= target && !selected.has(dte));
+      const below = available.slice().reverse()
+        .find((dte) => dte < target && !selected.has(dte));
+      const match = above === undefined ? below : above;
+      if (match !== undefined) selected.add(match);
+    });
+    return selected;
+  }
+
   function renderExpectedRangesView() {
     const ranges = state.data.views.expected_ranges;
     if (!ranges) return;
-    const body = ranges.rows.map((row) => {
-      const preferred = PREFERRED_EXPECTED_RANGE_DTES.has(row.dte);
+    const preferredDtes = preferredExpectedRangeDtes(ranges.rows);
+    const tiersOnly = $("expectedRangesTiers").checked;
+    const visibleRows = tiersOnly
+      ? ranges.rows.filter((row) => preferredDtes.has(Number(row.dte)))
+      : ranges.rows;
+    const body = visibleRows.map((row) => {
+      const preferred = preferredDtes.has(Number(row.dte));
       const rowAttributes = preferred
-        ? ' class="expected-range-preferred" title="Preferred trading DTE"' : "";
+        ? ' class="expected-range-preferred" title="Preferred trading DTE or nearest available expiration"'
+        : "";
       return "<tr" + rowAttributes + "><td>" +
         esc(Fmt.fmtExpiry(row.expiry) + " (" + row.dte + " DTE)") +
         '</td><td class="pos">' + Fmt.fmtStrike(row.call_1sd) +
@@ -544,6 +564,7 @@
     state.greeksPosition = state.greeksPosition === "long" ? "short" : "long";
     renderGreeksView();
   });
+  $("expectedRangesTiers").addEventListener("change", renderExpectedRangesView);
   document.querySelectorAll("#flowModeBtns button").forEach((b) =>
     b.addEventListener("click", () => {
       state.flowMode = b.dataset.mode; renderFlowView();

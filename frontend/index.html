@@ -8,12 +8,12 @@
   <link rel="icon" href="/favicon.ico" sizes="any">
   <link rel="icon" type="image/png" href="/favicon-32.png" sizes="32x32">
   <link rel="apple-touch-icon" href="/apple-touch-icon.png">
-  <link rel="stylesheet" href="/css/style.css?v=12">
+  <link rel="stylesheet" href="/css/style.css?v=13">
   <script defer src="/js/vendor/echarts.min.js?v=5.5.1"></script>
   <script defer src="/js/format.js?v=5"></script>
   <script defer src="/js/api.js?v=7"></script>
   <script defer src="/js/charts.js?v=12"></script>
-  <script defer src="/js/app.js?v=16"></script>
+  <script defer src="/js/app.js?v=17"></script>
 </head>
 <body>
   <header class="topbar">
@@ -129,9 +129,15 @@
     </section>
 
     <section id="panel-expected_ranges" class="panel hidden">
-      <div class="panel-note">Expected range strikes and gamma walls for every
-        available expiration. Expected moves use the nearest-to-spot call and
-        put mid-prices; 1 STD uses ATM implied volatility.</div>
+      <div class="panel-note expected-ranges-note">
+        <label class="tiers-filter">
+          <input id="expectedRangesTiers" type="checkbox">
+          <span>Tiers</span>
+        </label>
+        <span>Expected range strikes and gamma walls for every available
+          expiration. Expected moves use the nearest-to-spot call and put
+          mid-prices; 1 STD uses ATM implied volatility.</span>
+      </div>
       <div class="card">
         <div class="table-scroll"><table id="expectedRangesTable"></table></div>
       </div>

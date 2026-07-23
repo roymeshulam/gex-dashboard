@@ -97,6 +97,16 @@ main { padding: 14px; max-width: 1180px; margin: 0 auto; }
 .panel-note {
   color: var(--muted); font-size: 12px; margin: 2px 0 10px;
 }
+.expected-ranges-note {
+  display: flex; align-items: flex-start; gap: 10px;
+}
+.tiers-filter {
+  display: inline-flex; align-items: center; gap: 5px;
+  color: var(--text); cursor: pointer; white-space: nowrap;
+}
+.tiers-filter input {
+  margin: 1px 0 0; accent-color: var(--amber); cursor: pointer;
+}
 .panel-controls {
   display: flex; align-items: center; gap: 12px; flex-wrap: wrap;
   margin-bottom: 10px;
