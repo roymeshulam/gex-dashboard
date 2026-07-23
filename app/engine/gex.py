@@ -270,7 +270,7 @@ def _bucketed_rows(contracts: List[Contract], spot: float, step: float,
 def build_strikemap(contracts: List[Contract], spot: float, cfg: dict,
                     as_of: Optional[datetime.datetime] = None) -> dict:
     """Per-expiration strike ladders + walls/flip, plus summary tables."""
-    expiries = _expiries(contracts, config.MAX_STRIKEMAP_EXPIRATIONS)
+    expiries = sorted({c.expiry for c in contracts})
     step = choose_step(spot, cfg["window_pct"], cfg["steps"], config.MAX_HEATMAP_ROWS)
     lo, hi = _window(spot, cfg["window_pct"])
 

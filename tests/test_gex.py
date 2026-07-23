@@ -71,7 +71,7 @@ def test_heatmap_structure_and_conservation():
     assert abs(total_cells - expected) < 0.5
 
 
-def test_expiry_dropdowns_respect_configured_caps():
+def test_expiry_views_keep_every_available_dropdown_expiry():
     start = datetime.date(2099, 1, 1)
     contracts = [
         mk("C", 7400, gamma=0.001, oi=10, volume=10,
@@ -85,14 +85,11 @@ def test_expiry_dropdowns_respect_configured_caps():
     option_flow = flow.build_flow(contracts, 7400.0, cfg)
 
     assert len(heatmap["expiries"]) == 14
-    assert len(strikemap["expiries"]) == config.MAX_STRIKEMAP_EXPIRATIONS
-    assert len(option_flow["expiries"]) == config.MAX_FLOW_EXPIRATIONS
-    assert strikemap["expiries"][-1] == (
-        start + datetime.timedelta(days=config.MAX_STRIKEMAP_EXPIRATIONS - 1)
-    ).isoformat()
-    assert option_flow["expiries"][-1] == (
-        start + datetime.timedelta(days=config.MAX_FLOW_EXPIRATIONS - 1)
-    ).isoformat()
+    assert len(strikemap["expiries"]) == 31
+    assert len(option_flow["expiries"]) == 31
+    last_expiry = (start + datetime.timedelta(days=30)).isoformat()
+    assert strikemap["expiries"][-1] == last_expiry
+    assert option_flow["expiries"][-1] == last_expiry
 
 
 def test_flow_includes_open_interest_and_available_bid_ask_spreads():
@@ -136,6 +133,37 @@ def test_flow_expected_move_uses_nearest_call_and_put_mids_per_expiry():
         "sd_upper": 7800.0,
     }
     assert result[other_expiry.isoformat()]["expected_move"] is None
+
+
+def test_expected_ranges_combines_bounds_and_walls_for_every_expiry():
+    today = EXP_A - datetime.timedelta(days=28)
+    other_expiry = EXP_A + datetime.timedelta(days=7)
+    cs = [
+        mk("C", 7400, bid=10.0, ask=12.0, iv=0.18, expiry=EXP_A),
+        mk("P", 7400, bid=11.0, ask=13.0, iv=0.22, expiry=EXP_A),
+        mk("C", 7425, bid=8.0, ask=10.0, iv=0.19, expiry=other_expiry),
+        mk("P", 7425, bid=9.0, ask=11.0, iv=0.21, expiry=other_expiry),
+    ]
+    levels = {
+        EXP_A.isoformat(): {"call_wall": 7500, "put_wall": 7300},
+        other_expiry.isoformat(): {"call_wall": 7550, "put_wall": 7250},
+    }
+
+    result = flow.build_expected_ranges(cs, 7400.0, levels, today)
+
+    assert [row["expiry"] for row in result["rows"]] == [
+        EXP_A.isoformat(), other_expiry.isoformat()]
+    assert result["rows"][0] == {
+        "expiry": EXP_A.isoformat(),
+        "dte": 28,
+        "call_1sd": 7800.0,
+        "call_expected_move": 7425.0,
+        "call_wall": 7500,
+        "put_wall": 7300,
+        "put_expected_move": 7375.0,
+        "put_1sd": 7000.0,
+    }
+    assert result["rows"][1]["dte"] == 35
 
 
 def test_flow_builds_atm_iv_term_structure_by_dte():

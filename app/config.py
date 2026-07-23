@@ -24,8 +24,6 @@ CONTRACT_MULTIPLIER = 100
 
 MAX_HEATMAP_ROWS = 55      # cap on bucketed strike rows in heatmap/strike map
 MAX_EXPIRATIONS = 14       # heatmap columns
-MAX_STRIKEMAP_EXPIRATIONS = 30
-MAX_FLOW_EXPIRATIONS = 30
 TOP_STRIKES = 5            # top +/- GEX strikes in summary tables
 TOP_TRADES = 15            # top flow rows by premium
 

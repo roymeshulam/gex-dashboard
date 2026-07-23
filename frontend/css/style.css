@@ -156,6 +156,15 @@ th { color: var(--muted); font-size: 11px; text-transform: uppercase;
 th, td { padding: 5px 8px; border-bottom: 1px solid var(--border); }
 tr:last-child td { border-bottom: none; }
 .table-scroll { overflow-x: auto; }
+#expectedRangesTable tr:not(:first-child) td {
+  transition: background-color 120ms ease;
+}
+#expectedRangesTable tr:not(:first-child):hover td {
+  background: rgba(59, 130, 246, .16);
+}
+#expectedRangesTable tr:not(:first-child):hover td:first-child {
+  box-shadow: inset 3px 0 0 var(--accent);
+}
 
 /* sentiment */
 .grid-senti { display: grid; grid-template-columns: 320px 1fr; gap: 12px; }

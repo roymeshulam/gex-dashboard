@@ -54,8 +54,8 @@
 
     <h2>Strike Map</h2>
     <p>The tornado chart shows call GEX (green, right) and put GEX (red, left)
-    per strike for the selected expiration, with the net profile overlaid.
-    Lines mark:</p>
+    per strike for the selected expiration, with every expiration returned by
+    CBOE available in the selector. The net profile is overlaid. Lines mark:</p>
     <ul>
       <li><b>Call Wall</b> — strike with the largest positive net GEX
         (resistance / pin candidate).</li>
@@ -75,10 +75,17 @@
 
     <h2>Option Flow</h2>
     <p>Call and put volume (or traded premium) by strike for the selected
-    expiration, plus the largest contracts by premium. Side (buy/sell) is a
+    expiration, with every expiration returned by CBOE available in the
+    selector, plus the largest contracts by premium. Side (buy/sell) is a
     heuristic — last trade at/above the ask counts as buying, at/below the bid
     as selling. A big flow number is <b>not</b> automatically bullish or
     bearish; combine it with the heatmap and strike map.</p>
+
+    <h2>Expected Ranges</h2>
+    <p>One row per available expiration compares the upper one-standard-
+    deviation strike, upper expected-move strike, call wall, put wall, lower
+    expected-move strike, and lower one-standard-deviation strike. Expiration
+    labels include calendar DTE. Hover a row to highlight the selected expiry.</p>
 
     <h2>Sentiment</h2>
     <p>The page separates current directional pressure from the modeled

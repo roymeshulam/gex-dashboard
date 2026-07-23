@@ -4,14 +4,15 @@
 
 Free, self-hosted **SPX gamma-exposure dashboard** in the style of
 spxgexheatmap.com: GEX heatmap, strike map with walls & gamma flip, 0DTE
-roadmap, option flow, and a composite sentiment gauge. Mobile-friendly with a
-bottom tab bar.
+roadmap, option flow, expected ranges, and a composite sentiment gauge.
+Mobile-friendly with a bottom tab bar.
 The header Guide link remains available on mobile, with symbol controls
 wrapping onto a second row on narrow screens.
 
 The heatmap displays up to 14 expirations for readability. Strike Map and
-Option Flow selectors include up to 30 expiration dates for longer-range
-analysis.
+Option Flow selectors include every expiration returned by CBOE. Expected
+Ranges summarizes expected-move, one-standard-deviation, and wall strikes for
+every available expiration.
 
 - **Data**: free CBOE delayed quotes (`cdn.cboe.com`) — no API key, no cost.
   Quotes are ~15 min delayed; greeks (gamma/delta), IV, OI and volume are
@@ -25,7 +26,7 @@ analysis.
 ```bash
 python3 -m venv .venv && source .venv/bin/activate
 pip install -r requirements.txt
-pytest -q                                  # 40 unit tests
+pytest -q
 uvicorn app.main:app --reload --port 8000
 ```
 

@@ -60,6 +60,8 @@ async def build_snapshot(client: httpx.AsyncClient) -> dict:
     zerodte = gex_engine.build_zero_dte(
         contracts, spot, cfg, today, as_of=chain.last_trade_time)
     flow = flow_engine.build_flow(contracts, spot, cfg, today=today)
+    expected_ranges = flow_engine.build_expected_ranges(
+        contracts, spot, levels, today)
     greeks = greeks_engine.build_surface(contracts, spot, today)
     zshare = zerodte["stats"]["dte_share_pct"] if zerodte.get("available") else 0.0
     senti = sentiment_engine.compute_sentiment(
@@ -98,6 +100,7 @@ async def build_snapshot(client: httpx.AsyncClient) -> dict:
         "strikemap": strikemap,
         "levels": levels,
         "flow": flow,
+        "expected_ranges": expected_ranges,
         "volatility": {
             "term_structure": flow["term_structure"],
             "expected_move_term_structure": flow["expected_move_term_structure"],

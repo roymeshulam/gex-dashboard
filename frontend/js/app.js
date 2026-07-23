@@ -4,7 +4,8 @@
 
   const REFRESH_MS = 30000;
   const RETRY_MS = 5000;
-  const VIEWS = ["heatmap", "strikemap", "zerodte", "flow", "greeks", "sentiment", "volatility"];
+  const VIEWS = ["heatmap", "strikemap", "zerodte", "flow", "greeks",
+    "sentiment", "volatility", "expected_ranges"];
 
   const state = {
     view: "heatmap",
@@ -353,6 +354,25 @@
       $("chart-expected-move-term"), vol.expected_move_term_structure || []);
   }
 
+  function renderExpectedRangesView() {
+    const ranges = state.data.views.expected_ranges;
+    if (!ranges) return;
+    const body = ranges.rows.map((row) =>
+      "<tr><td>" + esc(Fmt.fmtExpiry(row.expiry) + " (" + row.dte + " DTE)") +
+      '</td><td class="pos">' + Fmt.fmtStrike(row.call_1sd) +
+      '</td><td class="pos">' + Fmt.fmtStrike(row.call_expected_move) +
+      '</td><td class="pos">' + Fmt.fmtStrike(row.call_wall) +
+      '</td><td class="neg">' + Fmt.fmtStrike(row.put_wall) +
+      '</td><td class="neg">' + Fmt.fmtStrike(row.put_expected_move) +
+      '</td><td class="neg">' + Fmt.fmtStrike(row.put_1sd) +
+      "</td></tr>").join("");
+    $("expectedRangesTable").innerHTML =
+      "<tr><th>Expiration</th><th>Call 1 STD</th><th>Call Expected Move</th>" +
+      "<th>Call Wall</th><th>Put Wall</th><th>Put Expected Move</th>" +
+      "<th>Put 1 STD</th></tr>" +
+      (body || '<tr><td colspan="7">No expirations available.</td></tr>');
+  }
+
   function greeksRows() {
     const surface = state.data.views.greeks;
     return surface && state.greeksExpiry
@@ -484,6 +504,7 @@
     else if (state.view === "flow") renderFlowView();
     else if (state.view === "sentiment") renderSentimentView();
     else if (state.view === "volatility") renderVolatilityView();
+    else if (state.view === "expected_ranges") renderExpectedRangesView();
     else if (state.view === "greeks") renderGreeksView();
   }
 
