@@ -81,8 +81,10 @@ def test_expiry_views_keep_every_available_dropdown_expiry():
     cfg = config.SPX
 
     heatmap = gex.build_heatmap(contracts, 7400.0, cfg)
-    strikemap = gex.build_strikemap(contracts, 7400.0, cfg)
-    option_flow = flow.build_flow(contracts, 7400.0, cfg)
+    strikemap = gex.build_strikemap(
+        contracts, 7400.0, cfg, today=start)
+    option_flow = flow.build_flow(
+        contracts, 7400.0, cfg, today=start)
 
     assert len(heatmap["expiries"]) == 14
     assert len(strikemap["expiries"]) == 31
@@ -90,6 +92,36 @@ def test_expiry_views_keep_every_available_dropdown_expiry():
     last_expiry = (start + datetime.timedelta(days=30)).isoformat()
     assert strikemap["expiries"][-1] == last_expiry
     assert option_flow["expiries"][-1] == last_expiry
+
+
+def test_expiry_views_include_365_dte_and_filter_later_expiries():
+    today = datetime.date(2026, 7, 23)
+    included = today + datetime.timedelta(days=365)
+    excluded = today + datetime.timedelta(days=366)
+    contracts = [
+        mk(cp, 7400, gamma=0.001, oi=10, volume=10, bid=10.0,
+           ask=12.0, expiry=expiry)
+        for expiry in (included, excluded)
+        for cp in ("C", "P")
+    ]
+
+    strikemap = gex.build_strikemap(
+        contracts, 7400.0, config.SPX, today=today)
+    option_flow = flow.build_flow(
+        contracts, 7400.0, config.SPX, today=today)
+    expected_ranges = flow.build_expected_ranges(
+        contracts, 7400.0, {}, today)
+
+    included_key = included.isoformat()
+    excluded_key = excluded.isoformat()
+    assert strikemap["expiries"] == [included_key]
+    assert excluded_key not in strikemap["by_expiry"]
+    assert option_flow["expiries"] == [included_key]
+    assert excluded_key not in option_flow["by_expiry"]
+    assert [row["dte"] for row in option_flow["term_structure"]] == [365]
+    assert [row["dte"] for row in
+            option_flow["expected_move_term_structure"]] == [365]
+    assert [row["dte"] for row in expected_ranges["rows"]] == [365]
 
 
 def test_flow_includes_open_interest_and_available_bid_ask_spreads():

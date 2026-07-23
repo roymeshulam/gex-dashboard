@@ -6,6 +6,7 @@
   const RETRY_MS = 5000;
   const VIEWS = ["heatmap", "strikemap", "zerodte", "flow", "greeks",
     "sentiment", "volatility", "expected_ranges"];
+  const PREFERRED_EXPECTED_RANGE_DTES = new Set([14, 28, 42, 56]);
 
   const state = {
     view: "heatmap",
@@ -357,15 +358,20 @@
   function renderExpectedRangesView() {
     const ranges = state.data.views.expected_ranges;
     if (!ranges) return;
-    const body = ranges.rows.map((row) =>
-      "<tr><td>" + esc(Fmt.fmtExpiry(row.expiry) + " (" + row.dte + " DTE)") +
-      '</td><td class="pos">' + Fmt.fmtStrike(row.call_1sd) +
-      '</td><td class="pos">' + Fmt.fmtStrike(row.call_expected_move) +
-      '</td><td class="pos">' + Fmt.fmtStrike(row.call_wall) +
-      '</td><td class="neg">' + Fmt.fmtStrike(row.put_wall) +
-      '</td><td class="neg">' + Fmt.fmtStrike(row.put_expected_move) +
-      '</td><td class="neg">' + Fmt.fmtStrike(row.put_1sd) +
-      "</td></tr>").join("");
+    const body = ranges.rows.map((row) => {
+      const preferred = PREFERRED_EXPECTED_RANGE_DTES.has(row.dte);
+      const rowAttributes = preferred
+        ? ' class="expected-range-preferred" title="Preferred trading DTE"' : "";
+      return "<tr" + rowAttributes + "><td>" +
+        esc(Fmt.fmtExpiry(row.expiry) + " (" + row.dte + " DTE)") +
+        '</td><td class="pos">' + Fmt.fmtStrike(row.call_1sd) +
+        '</td><td class="pos">' + Fmt.fmtStrike(row.call_expected_move) +
+        '</td><td class="pos">' + Fmt.fmtStrike(row.call_wall) +
+        '</td><td class="neg">' + Fmt.fmtStrike(row.put_wall) +
+        '</td><td class="neg">' + Fmt.fmtStrike(row.put_expected_move) +
+        '</td><td class="neg">' + Fmt.fmtStrike(row.put_1sd) +
+        "</td></tr>";
+    }).join("");
     $("expectedRangesTable").innerHTML =
       "<tr><th>Expiration</th><th>Call 1 STD</th><th>Call Expected Move</th>" +
       "<th>Call Wall</th><th>Put Wall</th><th>Put Expected Move</th>" +

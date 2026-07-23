@@ -54,7 +54,7 @@ async def build_snapshot(client: httpx.AsyncClient) -> dict:
 
     heatmap = gex_engine.build_heatmap(contracts, spot, cfg)
     strikemap = gex_engine.build_strikemap(
-        contracts, spot, cfg, as_of=chain.last_trade_time)
+        contracts, spot, cfg, as_of=chain.last_trade_time, today=today)
     levels = gex_engine.build_expiry_levels(
         contracts, spot, as_of=chain.last_trade_time)
     zerodte = gex_engine.build_zero_dte(

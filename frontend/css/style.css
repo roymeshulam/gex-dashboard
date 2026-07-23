@@ -159,11 +159,25 @@ tr:last-child td { border-bottom: none; }
 #expectedRangesTable tr:not(:first-child) td {
   transition: background-color 120ms ease;
 }
+#expectedRangesTable tr.expected-range-preferred td {
+  background: rgba(245, 166, 35, .12);
+}
+#expectedRangesTable tr.expected-range-preferred td:first-child {
+  box-shadow: inset 3px 0 0 var(--amber);
+  color: var(--amber);
+  font-weight: 700;
+}
 #expectedRangesTable tr:not(:first-child):hover td {
   background: rgba(59, 130, 246, .16);
 }
 #expectedRangesTable tr:not(:first-child):hover td:first-child {
   box-shadow: inset 3px 0 0 var(--accent);
+}
+#expectedRangesTable tr.expected-range-preferred:hover td {
+  background: rgba(245, 166, 35, .2);
+}
+#expectedRangesTable tr.expected-range-preferred:hover td:first-child {
+  box-shadow: inset 3px 0 0 var(--amber);
 }
 
 /* sentiment */

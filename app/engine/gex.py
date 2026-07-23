@@ -268,9 +268,14 @@ def _bucketed_rows(contracts: List[Contract], spot: float, step: float,
 
 
 def build_strikemap(contracts: List[Contract], spot: float, cfg: dict,
-                    as_of: Optional[datetime.datetime] = None) -> dict:
+                    as_of: Optional[datetime.datetime] = None,
+                    today: Optional[datetime.date] = None) -> dict:
     """Per-expiration strike ladders + walls/flip, plus summary tables."""
-    expiries = sorted({c.expiry for c in contracts})
+    today = today or datetime.date.today()
+    expiries = sorted({
+        c.expiry for c in contracts
+        if 0 <= (c.expiry - today).days <= config.MAX_EXPIRY_DTE
+    })
     step = choose_step(spot, cfg["window_pct"], cfg["steps"], config.MAX_HEATMAP_ROWS)
     lo, hi = _window(spot, cfg["window_pct"])
 

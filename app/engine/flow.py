@@ -79,9 +79,13 @@ def _expected_move(contracts: List[Contract], spot: float,
 
 def build_expected_ranges(contracts: List[Contract], spot: float,
                           levels: dict, today: datetime.date) -> dict:
-    """Strike-level expected ranges and GEX walls for every expiration."""
+    """Strike-level expected ranges and GEX walls through the UI horizon."""
     rows = []
-    for expiry in sorted({c.expiry for c in contracts}):
+    expiries = sorted({
+        c.expiry for c in contracts
+        if 0 <= (c.expiry - today).days <= config.MAX_EXPIRY_DTE
+    })
+    for expiry in expiries:
         key = expiry.isoformat()
         expected = _expected_move(contracts, spot, expiry, today)
         walls = levels.get(key, {})
@@ -101,7 +105,10 @@ def build_expected_ranges(contracts: List[Contract], spot: float,
 def build_flow(contracts: List[Contract], spot: float, cfg: dict,
                today: Optional[datetime.date] = None) -> dict:
     today = today or datetime.date.today()
-    expiries = sorted({c.expiry for c in contracts})
+    expiries = sorted({
+        c.expiry for c in contracts
+        if 0 <= (c.expiry - today).days <= config.MAX_EXPIRY_DTE
+    })
     keys = [e.isoformat() for e in expiries]
     step = choose_step(spot, cfg["window_pct"], cfg["steps"], config.MAX_HEATMAP_ROWS)
     lo, hi = _window(spot, cfg["window_pct"])

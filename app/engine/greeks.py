@@ -5,6 +5,7 @@ import datetime
 import math
 from typing import Iterable
 
+from .. import config
 from ..models import Contract
 
 RISK_FREE_RATE = 0.043
@@ -83,7 +84,9 @@ def build_surface(contracts: Iterable[Contract], spot: float,
     """Retain only quoted IVs needed for interactive server-side pricing."""
     rows = {}
     for contract in contracts:
-        if contract.iv <= 0.0 or contract.expiry < today:
+        dte = (contract.expiry - today).days
+        if (contract.iv <= 0.0 or dte < 0 or
+                dte > config.MAX_EXPIRY_DTE):
             continue
         key = (contract.expiry.isoformat(), contract.strike, contract.cp)
         current = rows.get(key)

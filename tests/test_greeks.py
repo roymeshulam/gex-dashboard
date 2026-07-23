@@ -64,9 +64,23 @@ def test_curves_use_selected_implied_volatility_and_count_down_to_expiry():
     assert len(later["time_curve"]) == 31
 
 
+def test_surface_includes_365_dte_and_filters_later_expiries():
+    today = datetime.date(2026, 7, 23)
+    included = today + datetime.timedelta(days=365)
+    excluded = today + datetime.timedelta(days=366)
+    surface = build_surface([
+        mk(expiry=included, cp="C", strike=6000, iv=0.20),
+        mk(expiry=excluded, cp="C", strike=6000, iv=0.20),
+    ], 6000.0, today)
+
+    assert surface["expiries"] == [included.isoformat()]
+    assert surface["by_expiry"][included.isoformat()]["dte"] == 365
+    assert excluded.isoformat() not in surface["by_expiry"]
+
+
 def test_long_time_curves_are_downsampled_with_endpoints_preserved():
     today = datetime.date(2026, 7, 18)
-    expiry = today + datetime.timedelta(days=730)
+    expiry = today + datetime.timedelta(days=365)
     surface = build_surface([
         mk(expiry=expiry, cp="C", strike=6000, iv=0.20, bid=10, ask=11),
     ], 6000.0, today)
@@ -75,7 +89,7 @@ def test_long_time_curves_are_downsampled_with_endpoints_preserved():
     dtes = [row[0] for row in result["time_curve"]]
 
     assert len(dtes) == 121
-    assert dtes[0] == 730
+    assert dtes[0] == 365
     assert dtes[-1] == 0
     assert all(left > right for left, right in zip(dtes, dtes[1:]))
 
