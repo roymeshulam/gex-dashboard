@@ -118,6 +118,11 @@
       '</span><span class="v ' + (valueCls || "") + '">' + value + "</span></div>";
   }
 
+  function strikeDistancePct(strike, spot) {
+    if (strike === null || strike === undefined || !spot) return null;
+    return (strike - spot) / spot * 100;
+  }
+
   function renderStatus() {
     const d = state.data;
     if (!d) return;
@@ -136,7 +141,9 @@
       "", s.regime === "positive" ? "pos" : "neg");
     html += chipHtml("Gamma Flip", Fmt.fmtStrike(s.flip));
     html += chipHtml("Call Wall", Fmt.fmtStrike(s.call_wall), "", "pos");
+    html += chipHtml("Call Dist", Fmt.fmtPct(strikeDistancePct(s.call_wall, s.spot)), "", "pos");
     html += chipHtml("Put Wall", Fmt.fmtStrike(s.put_wall), "", "neg");
+    html += chipHtml("Put Dist", Fmt.fmtPct(strikeDistancePct(s.put_wall, s.spot)), "", "neg");
     html += chipHtml("Call Δ", Fmt.fmtBn(s.call_dex_bn));
     html += chipHtml("Put Δ", Fmt.fmtBn(s.put_dex_bn));
     html += chipHtml("P/C Vol", s.pcr_vol === null ? "—" : s.pcr_vol.toFixed(2));
@@ -174,7 +181,9 @@
       chipHtml("Spot", Fmt.fmtStrike(lv.spot)) +
       chipHtml("Flip", Fmt.fmtStrike(lv.flip), "", "warn") +
       chipHtml("Call Wall", Fmt.fmtStrike(lv.call_wall), "", "pos") +
-      chipHtml("Put Wall", Fmt.fmtStrike(lv.put_wall), "", "neg");
+      chipHtml("Call Dist", Fmt.fmtPct(strikeDistancePct(lv.call_wall, lv.spot)), "", "pos") +
+      chipHtml("Put Wall", Fmt.fmtStrike(lv.put_wall), "", "neg") +
+      chipHtml("Put Dist", Fmt.fmtPct(strikeDistancePct(lv.put_wall, lv.spot)), "", "neg");
   }
 
   function fillExpirySelect(sel, keys, current) {

@@ -25,6 +25,19 @@ def test_expected_ranges_tiers_checkbox_filters_to_highlighted_rows():
     assert '$("expectedRangesTiers").addEventListener("change"' in app_source
 
 
+def test_strikemap_level_chips_show_wall_distance_from_spot():
+    app_source = (ROOT / "frontend" / "js" / "app.js").read_text(encoding="utf-8")
+    html_source = (ROOT / "frontend" / "index.html").read_text(encoding="utf-8")
+
+    assert "function strikeDistancePct(strike, spot)" in app_source
+    assert "return (strike - spot) / spot * 100;" in app_source
+    assert 'chipHtml("Call Dist", Fmt.fmtPct(strikeDistancePct(lv.call_wall, lv.spot))' in app_source
+    assert 'chipHtml("Put Dist", Fmt.fmtPct(strikeDistancePct(lv.put_wall, lv.spot))' in app_source
+    assert 'chipHtml("Call Dist", Fmt.fmtPct(strikeDistancePct(s.call_wall, s.spot))' in app_source
+    assert 'chipHtml("Put Dist", Fmt.fmtPct(strikeDistancePct(s.put_wall, s.spot))' in app_source
+    assert "/js/app.js?v=18" in html_source
+
+
 def test_expected_range_fallback_prefers_nearest_available_dte_above():
     preferred = [14, 28, 42, 56]
     available = [14, 28, 43, 58, 70]
